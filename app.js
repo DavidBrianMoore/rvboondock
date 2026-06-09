@@ -58,6 +58,8 @@ const DUMP_STATIONS = [
   {
     name: "Pine View RV Park",
     location: "Bellemont, AZ (Exit 185)",
+    address: "1 Hughes Ave, Bellemont, AZ 86015",
+    phone: "(928) 699-8866",
     distance: "3 miles from FR 222 entrance",
     fee: "$15 (non-guest rate)",
     water: "Potable water fill included",
@@ -67,6 +69,8 @@ const DUMP_STATIONS = [
   {
     name: "Black Bart's RV Park",
     location: "Flagstaff, AZ (Exit 198)",
+    address: "2760 E Butler Ave, Flagstaff, AZ 86004",
+    phone: "(928) 774-1912",
     distance: "14 miles east of Bellemont",
     fee: "$20",
     water: "Potable water fill included",
@@ -76,6 +80,8 @@ const DUMP_STATIONS = [
   {
     name: "Fort Tuthill County Campground",
     location: "Flagstaff, AZ (Exit 337 on I-17)",
+    address: "2446 Fort Tuthill Loop, Flagstaff, AZ 86005",
+    phone: "(928) 286-7060",
     distance: "12 miles from Bellemont",
     fee: "$10",
     water: "Potable water fill included",
@@ -85,6 +91,8 @@ const DUMP_STATIONS = [
   {
     name: "Maverik Adventure First Stop",
     location: "Flagstaff, AZ (Exit 191 on I-40)",
+    address: "1690 W Route 66, Flagstaff, AZ 86001",
+    phone: "(928) 773-0424",
     distance: "9 miles east of Bellemont",
     fee: "$10 (Rinse water only)",
     water: "No potable water at dump island",
@@ -358,6 +366,10 @@ function renderDumpList() {
   list.innerHTML = "";
   
   DUMP_STATIONS.forEach(dump => {
+    const cleanPhone = dump.phone.replace(/\D/g, "");
+    const appleMapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(dump.name + " " + dump.address)}`;
+    const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dump.name + " " + dump.address)}`;
+
     const card = document.createElement("div");
     card.className = "dump-card glass";
     card.innerHTML = `
@@ -369,6 +381,14 @@ function renderDumpList() {
           </div>
         </div>
         <div class="card-body">
+          <div class="card-stat">
+            <span class="card-stat-label">Address:</span>
+            <span class="card-stat-val text-right">${dump.address}</span>
+          </div>
+          <div class="card-stat">
+            <span class="card-stat-label">Phone:</span>
+            <span class="card-stat-val"><a href="tel:${cleanPhone}" class="phone-link">📞 ${dump.phone}</a></span>
+          </div>
           <div class="card-stat">
             <span class="card-stat-label">Transit Distance:</span>
             <span class="card-stat-val">${dump.distance}</span>
@@ -387,6 +407,10 @@ function renderDumpList() {
           </div>
           <p class="card-description"><strong>Seasonality:</strong> ${dump.status}</p>
         </div>
+      </div>
+      <div class="btn-group" style="margin-top: 1rem; width: 100%;">
+        <a href="${appleMapsUrl}" class="btn secondary-btn mini-btn maps-btn" style="flex: 1;" target="_blank">🍎 Apple Maps</a>
+        <a href="${googleMapsUrl}" class="btn secondary-btn mini-btn maps-btn" style="flex: 1;" target="_blank">🗺️ Google Maps</a>
       </div>
     `;
     list.appendChild(card);
