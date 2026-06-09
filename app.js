@@ -1,4 +1,5 @@
 // Mock and Curated Data for Bellemont / Wing Mountain Area
+// Mock and Curated Data for Bellemont / Wing Mountain Area
 const FOREST_ROADS = [
   {
     id: "fr171",
@@ -11,7 +12,9 @@ const FOREST_ROADS = [
     roadGrade: "Wide gravel and dirt, some washboarding. Generally good for most tow rigs.",
     turnaround: "Excellent (multiple wide circular clearings at dispersed camps).",
     mvumCorridor: "300 feet dispersed camping corridor",
-    satelliteLink: "https://www.google.com/maps/@35.2536,-111.7942,805m/data=!3m1!1e3"
+    satelliteLink: "https://www.google.com/maps/@35.2536,-111.7942,805m/data=!3m1!1e3",
+    lat: 35.2536,
+    lng: -111.7942
   },
   {
     id: "fr222",
@@ -24,7 +27,9 @@ const FOREST_ROADS = [
     roadGrade: "Gravel and hard dirt, gets narrower and rockier as you proceed north.",
     turnaround: "Fair (requires scouting; few large loops, mostly linear pullouts).",
     mvumCorridor: "300 feet dispersed camping corridor",
-    satelliteLink: "https://www.google.com/maps/@35.2678,-111.7584,805m/data=!3m1!1e3"
+    satelliteLink: "https://www.google.com/maps/@35.2678,-111.7584,805m/data=!3m1!1e3",
+    lat: 35.2678,
+    lng: -111.7584
   },
   {
     id: "fr222b",
@@ -37,7 +42,9 @@ const FOREST_ROADS = [
     roadGrade: "Very narrow dirt tracks, soft shoulder, low overhanging ponderosa pine canopy.",
     turnaround: "Poor (extremely tight turnouts, high risk of jackknifing a long trailer).",
     mvumCorridor: "Designated dispersed camping sites only",
-    satelliteLink: "https://www.google.com/maps/@35.2755,-111.7455,805m/data=!3m1!1e3"
+    satelliteLink: "https://www.google.com/maps/@35.2755,-111.7455,805m/data=!3m1!1e3",
+    lat: 35.2755,
+    lng: -111.7455
   },
   {
     id: "fr519",
@@ -50,7 +57,9 @@ const FOREST_ROADS = [
     roadGrade: "Rocky tracks with basalt gravel. Some steep grading transitions near highway.",
     turnaround: "Good (large open staging areas at road intersections).",
     mvumCorridor: "300 feet dispersed camping corridor",
-    satelliteLink: "https://www.google.com/maps/@35.2811,-111.7899,805m/data=!3m1!1e3"
+    satelliteLink: "https://www.google.com/maps/@35.2811,-111.7899,805m/data=!3m1!1e3",
+    lat: 35.2811,
+    lng: -111.7899
   },
   {
     id: "fr245",
@@ -63,7 +72,9 @@ const FOREST_ROADS = [
     roadGrade: "Rough dirt/gravel road with deep washboard sections and volcanic basalt rock surfaces.",
     turnaround: "Fair (mostly tight pullouts, requires scouting before parking a large rig).",
     mvumCorridor: "300 feet dispersed camping corridor",
-    satelliteLink: "https://www.google.com/maps/@35.3130,-111.7580,805m/data=!3m1!1e3"
+    satelliteLink: "https://www.google.com/maps/@35.3130,-111.7580,805m/data=!3m1!1e3",
+    lat: 35.3130,
+    lng: -111.7580
   }
 ];
 
@@ -78,7 +89,9 @@ const DUMP_STATIONS = [
     water: "Potable water fill included",
     access: "Commercial paved layout, big rig friendly",
     status: "Open year-round",
-    public: true
+    public: true,
+    lat: 35.1980,
+    lng: -111.6095
   },
   {
     name: "Fort Tuthill County Campground",
@@ -90,7 +103,9 @@ const DUMP_STATIONS = [
     water: "Potable water fill included",
     access: "Good gravel access lane",
     status: "Open mid-April to mid-October",
-    public: true
+    public: true,
+    lat: 35.1315,
+    lng: -111.6890
   },
   {
     name: "Maverik Adventure First Stop",
@@ -102,7 +117,9 @@ const DUMP_STATIONS = [
     water: "No potable water at dump island",
     access: "Tight commercial layout, best for sub-30ft rigs",
     status: "Open year-round",
-    public: true
+    public: true,
+    lat: 35.1945,
+    lng: -111.6660
   }
 ];
 
@@ -117,11 +134,17 @@ let rigProfile = {
 let loggedSpots = [];
 let currentWizardStep = 1;
 
+// Firebase / Shared Location state
+const db = typeof firebase !== 'undefined' ? firebase.firestore() : null;
+let userLocation = null; // { lat, lng, timestamp }
+
 // Elements
 const navItems = document.querySelectorAll(".nav-item");
 const tabViews = document.querySelectorAll(".tab-view");
 const pageTitle = document.getElementById("page-title");
 const pageSubtitle = document.getElementById("page-subtitle");
+const pillCoords = document.getElementById("pill-coords");
+const btnSyncGps = document.getElementById("btn-sync-gps");
 
 const rigForm = document.getElementById("rig-form");
 const rigLengthInput = document.getElementById("rig-length");
@@ -135,6 +158,87 @@ const visualTrailer = document.getElementById("visual-trailer");
 const visualLengthText = document.getElementById("visual-length-text");
 const threatLevelText = document.getElementById("threat-level");
 const clearanceLevelText = document.getElementById("clearance-level");
+
+// Haversine distance calculator
+function getDistance(lat1, lon1, lat2, lon2) {
+  const R = 3958.8; // Earth radius in miles
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+function updateLocationPill() {
+  if (userLocation) {
+    const timeStr = userLocation.timestamp ? new Date(userLocation.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Just now';
+    pillCoords.textContent = `${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)} (${timeStr})`;
+    pillCoords.parentElement.style.background = "rgba(16, 185, 129, 0.15)";
+  } else {
+    pillCoords.textContent = "Offline / No GPS";
+  }
+}
+
+function syncCurrentGPS() {
+  if (!navigator.geolocation) {
+    alert("Geolocation is not supported by your browser/device.");
+    return;
+  }
+  
+  btnSyncGps.textContent = "Locating...";
+  btnSyncGps.disabled = true;
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const coords = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        timestamp: Date.now()
+      };
+      
+      userLocation = coords;
+      updateLocationPill();
+      renderRoadsList();
+      renderDumpList();
+      
+      // Save to Firestore so it auto-uploads for desktop planning
+      if (db) {
+        db.collection("locations").doc("david").set({
+          lat: coords.lat,
+          lng: coords.lng,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(() => {
+          btnSyncGps.textContent = "Synced";
+          setTimeout(() => {
+            btnSyncGps.textContent = "Sync GPS";
+            btnSyncGps.disabled = false;
+          }, 1500);
+        }).catch(err => {
+          console.error("Firestore sync error:", err);
+          btnSyncGps.textContent = "Sync GPS";
+          btnSyncGps.disabled = false;
+        });
+      } else {
+        btnSyncGps.textContent = "Saved Local";
+        setTimeout(() => {
+          btnSyncGps.textContent = "Sync GPS";
+          btnSyncGps.disabled = false;
+        }, 1500);
+      }
+    },
+    (error) => {
+      alert(`Error getting location: ${error.message}`);
+      btnSyncGps.textContent = "Sync GPS";
+      btnSyncGps.disabled = false;
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
+}
+
+btnSyncGps.addEventListener("click", syncCurrentGPS);
 
 // Tab Navigation
 navItems.forEach(item => {
@@ -325,6 +429,16 @@ function renderRoadsList() {
     const carrierVal = road.cellSignal[rigProfile.carrier];
     const carrierLabel = rigProfile.carrier.toUpperCase();
 
+    let distanceHtml = "";
+    if (userLocation && road.lat && road.lng) {
+      const distance = getDistance(userLocation.lat, userLocation.lng, road.lat, road.lng);
+      distanceHtml = `
+        <div class="card-stat" style="border-bottom-color: rgba(56, 189, 248, 0.15); padding-bottom: 0.4rem;">
+          <span class="card-stat-label" style="color: var(--accent); font-weight: 600;">Distance from GPS:</span>
+          <span class="card-stat-val" style="color: var(--accent); font-weight: 700;">${distance.toFixed(1)} miles</span>
+        </div>`;
+    }
+
     const card = document.createElement("div");
     card.className = "road-card glass";
     card.innerHTML = `
@@ -337,6 +451,7 @@ function renderRoadsList() {
           <span class="status-badge ${statusClass}">${statusText}</span>
         </div>
         <div class="card-body">
+          ${distanceHtml}
           <div class="card-stat">
             <span class="card-stat-label">Max Safe Length:</span>
             <span class="card-stat-val">${road.maxLength} ft</span>
@@ -375,6 +490,16 @@ function renderDumpList() {
     const appleMapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(dump.name + " " + dump.address)}`;
     const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dump.name + " " + dump.address)}`;
 
+    let distanceHtml = "";
+    if (userLocation && dump.lat && dump.lng) {
+      const distance = getDistance(userLocation.lat, userLocation.lng, dump.lat, dump.lng);
+      distanceHtml = `
+        <div class="card-stat" style="border-bottom-color: rgba(56, 189, 248, 0.15); padding-bottom: 0.4rem;">
+          <span class="card-stat-label" style="color: var(--accent); font-weight: 600;">Distance from GPS:</span>
+          <span class="card-stat-val" style="color: var(--accent); font-weight: 700;">${distance.toFixed(1)} miles</span>
+        </div>`;
+    }
+
     const card = document.createElement("div");
     card.className = "dump-card glass";
     
@@ -396,6 +521,7 @@ function renderDumpList() {
           ${restrictionBadge}
         </div>
         <div class="card-body">
+          ${distanceHtml}
           ${dump.restriction ? `
           <div class="card-stat" style="border-bottom-color: rgba(239, 68, 68, 0.15); padding-bottom: 0.4rem;">
             <span class="card-stat-label" style="color: var(--danger)">Restriction:</span>
@@ -534,21 +660,29 @@ logForm.addEventListener("submit", (e) => {
   const road = FOREST_ROADS.find(r => r.id === roadId);
   
   const newSpot = {
-    id: Date.now().toString(),
     roadName: road.name,
     roadNumber: road.number,
     coords: document.getElementById("log-coords").value,
     signal: parseInt(document.getElementById("log-signal").value),
     dumpStation: logDumpSelect.value,
     notes: document.getElementById("log-notes").value,
-    timestamp: new Date().toLocaleDateString()
+    timestamp: new Date().toLocaleDateString(),
+    createdAt: Date.now()
   };
 
-  loggedSpots.unshift(newSpot);
-  localStorage.setItem("rv_boondock_spots", JSON.stringify(loggedSpots));
-  renderLoggedSpots();
-  logForm.reset();
-  initLoggerSelects();
+  if (db) {
+    db.collection("logged_spots").add(newSpot).then(() => {
+      logForm.reset();
+      initLoggerSelects();
+    }).catch(err => console.error("Error adding spot to Firestore:", err));
+  } else {
+    newSpot.id = Date.now().toString();
+    loggedSpots.unshift(newSpot);
+    localStorage.setItem("rv_boondock_spots", JSON.stringify(loggedSpots));
+    renderLoggedSpots();
+    logForm.reset();
+    initLoggerSelects();
+  }
 });
 
 function renderLoggedSpots() {
@@ -582,9 +716,14 @@ function renderLoggedSpots() {
 }
 
 window.deleteSpot = function(id) {
-  loggedSpots = loggedSpots.filter(s => s.id !== id);
-  localStorage.setItem("rv_boondock_spots", JSON.stringify(loggedSpots));
-  renderLoggedSpots();
+  if (db) {
+    db.collection("logged_spots").doc(id).delete()
+      .catch(err => console.error("Error deleting spot from Firestore:", err));
+  } else {
+    loggedSpots = loggedSpots.filter(s => s.id !== id);
+    localStorage.setItem("rv_boondock_spots", JSON.stringify(loggedSpots));
+    renderLoggedSpots();
+  }
 };
 
 window.exportSpot = function(id) {
@@ -618,11 +757,46 @@ function init() {
   loadRigProfile();
   initLoggerSelects();
   
-  const savedSpots = localStorage.getItem("rv_boondock_spots");
-  if (savedSpots) {
-    loggedSpots = JSON.parse(savedSpots);
+  if (db) {
+    // 1. Subscribe to shared real-time location sync
+    db.collection("locations").doc("david").onSnapshot(doc => {
+      if (doc.exists) {
+        const data = doc.data();
+        if (data.lat && data.lng) {
+          const t = data.timestamp ? data.timestamp.toDate() : new Date();
+          userLocation = {
+            lat: data.lat,
+            lng: data.lng,
+            timestamp: t
+          };
+          updateLocationPill();
+          renderRoadsList();
+          renderDumpList();
+        }
+      }
+    });
+
+    // 2. Subscribe to synced spots database
+    db.collection("logged_spots").orderBy("createdAt", "desc").onSnapshot(snapshot => {
+      loggedSpots = [];
+      snapshot.forEach(doc => {
+        loggedSpots.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+      renderLoggedSpots();
+    }, err => {
+      console.error("Firestore snapshot error (check if Firestore is provisioned in the console):", err);
+    });
+  } else {
+    // Fallback to local storage if running without Firebase backend
+    const savedSpots = localStorage.getItem("rv_boondock_spots");
+    if (savedSpots) {
+      loggedSpots = JSON.parse(savedSpots);
+    }
+    renderLoggedSpots();
   }
-  renderLoggedSpots();
   
   renderRoadsList();
   renderDumpList();

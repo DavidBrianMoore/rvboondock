@@ -61,6 +61,11 @@
           <p id="page-subtitle">Configure your tow vehicle and trailer specifications for safe navigation.</p>
         </div>
         <div class="quick-rig-status">
+          <div class="stat-pill gps-pill" id="gps-tracker">
+            <span class="stat-label">📍 Location:</span>
+            <span class="stat-value" id="pill-coords">Offline / No GPS</span>
+            <button class="gps-btn" id="btn-sync-gps" title="Sync current GPS to database">Sync GPS</button>
+          </div>
           <div class="stat-pill">
             <span class="stat-label">Total Length:</span>
             <span class="stat-value" id="pill-length">-- ft</span>
@@ -401,6 +406,11 @@
       </div>
     </main>
   </div>
+  
+  <!-- Firebase SDK and configuration -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="/__/firebase/init.js?useEmulator=false"></script>
   
   <script src="app.js"></script>
 </body>
