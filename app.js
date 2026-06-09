@@ -51,6 +51,19 @@ const FOREST_ROADS = [
     turnaround: "Good (large open staging areas at road intersections).",
     mvumCorridor: "300 feet dispersed camping corridor",
     satelliteLink: "https://www.google.com/maps/@35.2811,-111.7899,805m/data=!3m1!1e3"
+  },
+  {
+    id: "fr245",
+    name: "Forest Road 245 (Kendrick Mtn)",
+    number: "FR 245",
+    maxLength: 38,
+    minClearance: 10,
+    difficulty: "Hard",
+    cellSignal: { verizon: 2, att: 2, tmobile: 1 },
+    roadGrade: "Rough dirt/gravel road with deep washboard sections and volcanic basalt rock surfaces.",
+    turnaround: "Fair (mostly tight pullouts, requires scouting before parking a large rig).",
+    mvumCorridor: "300 feet dispersed camping corridor",
+    satelliteLink: "https://www.google.com/maps/@35.3130,-111.7580,805m/data=!3m1!1e3"
   }
 ];
 
