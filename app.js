@@ -1,0 +1,578 @@
+// Mock and Curated Data for Bellemont / Wing Mountain Area
+const FOREST_ROADS = [
+  {
+    id: "fr171",
+    name: "Forest Road 171",
+    number: "FR 171",
+    maxLength: 55,
+    minClearance: 8,
+    difficulty: "Easy-Medium",
+    cellSignal: { verizon: 3, att: 4, tmobile: 2 },
+    roadGrade: "Wide gravel and dirt, some washboarding. Generally good for most tow rigs.",
+    turnaround: "Excellent (multiple wide circular clearings at dispersed camps).",
+    mvumCorridor: "300 feet dispersed camping corridor",
+    satelliteLink: "https://www.google.com/maps/@35.2536,-111.7942,805m/data=!3m1!1e3"
+  },
+  {
+    id: "fr222",
+    name: "Forest Road 222",
+    number: "FR 222",
+    maxLength: 42,
+    minClearance: 10,
+    difficulty: "Medium",
+    cellSignal: { verizon: 4, att: 3, tmobile: 3 },
+    roadGrade: "Gravel and hard dirt, gets narrower and rockier as you proceed north.",
+    turnaround: "Fair (requires scouting; few large loops, mostly linear pullouts).",
+    mvumCorridor: "300 feet dispersed camping corridor",
+    satelliteLink: "https://www.google.com/maps/@35.2678,-111.7584,805m/data=!3m1!1e3"
+  },
+  {
+    id: "fr222b",
+    name: "Wing Mountain Snowplay Corridor",
+    number: "FR 222B",
+    maxLength: 30,
+    minClearance: 12,
+    difficulty: "Hard",
+    cellSignal: { verizon: 4, att: 4, tmobile: 4 },
+    roadGrade: "Very narrow dirt tracks, soft shoulder, low overhanging ponderosa pine canopy.",
+    turnaround: "Poor (extremely tight turnouts, high risk of jackknifing a long trailer).",
+    mvumCorridor: "Designated dispersed camping sites only",
+    satelliteLink: "https://www.google.com/maps/@35.2755,-111.7455,805m/data=!3m1!1e3"
+  },
+  {
+    id: "fr519",
+    name: "Wing Mountain West",
+    number: "FR 519",
+    maxLength: 48,
+    minClearance: 9,
+    difficulty: "Medium",
+    cellSignal: { verizon: 2, att: 3, tmobile: 1 },
+    roadGrade: "Rocky tracks with basalt gravel. Some steep grading transitions near highway.",
+    turnaround: "Good (large open staging areas at road intersections).",
+    mvumCorridor: "300 feet dispersed camping corridor",
+    satelliteLink: "https://www.google.com/maps/@35.2811,-111.7899,805m/data=!3m1!1e3"
+  }
+];
+
+const DUMP_STATIONS = [
+  {
+    name: "Pine View RV Park",
+    location: "Bellemont, AZ (Exit 185)",
+    distance: "3 miles from FR 222 entrance",
+    fee: "$15 (non-guest rate)",
+    water: "Potable water fill included",
+    access: "Easy access for trailers and big rigs",
+    status: "Open seasonal (typically April to November)"
+  },
+  {
+    name: "Black Bart's RV Park",
+    location: "Flagstaff, AZ (Exit 198)",
+    distance: "14 miles east of Bellemont",
+    fee: "$20",
+    water: "Potable water fill included",
+    access: "Commercial paved layout, big rig friendly",
+    status: "Open year-round"
+  },
+  {
+    name: "Fort Tuthill County Campground",
+    location: "Flagstaff, AZ (Exit 337 on I-17)",
+    distance: "12 miles from Bellemont",
+    fee: "$10",
+    water: "Potable water fill included",
+    access: "Good gravel access lane",
+    status: "Open mid-April to mid-October"
+  },
+  {
+    name: "Maverik Adventure First Stop",
+    location: "Flagstaff, AZ (Exit 191 on I-40)",
+    distance: "9 miles east of Bellemont",
+    fee: "$10 (Rinse water only)",
+    water: "No potable water at dump island",
+    access: "Tight commercial layout, best for sub-30ft rigs",
+    status: "Open year-round"
+  }
+];
+
+// App State Management
+let rigProfile = {
+  length: 45,
+  clearance: 10,
+  wheelbase: 24,
+  carrier: "verizon"
+};
+
+let loggedSpots = [];
+let currentWizardStep = 1;
+
+// Elements
+const navItems = document.querySelectorAll(".nav-item");
+const tabViews = document.querySelectorAll(".tab-view");
+const pageTitle = document.getElementById("page-title");
+const pageSubtitle = document.getElementById("page-subtitle");
+
+const rigForm = document.getElementById("rig-form");
+const rigLengthInput = document.getElementById("rig-length");
+const rigClearanceInput = document.getElementById("rig-clearance");
+const rigWheelbaseInput = document.getElementById("rig-wheelbase");
+const rigCarrierSelect = document.getElementById("rig-carrier");
+
+const pillLength = document.getElementById("pill-length");
+const pillClearance = document.getElementById("pill-clearance");
+const visualTrailer = document.getElementById("visual-trailer");
+const visualLengthText = document.getElementById("visual-length-text");
+const threatLevelText = document.getElementById("threat-level");
+const clearanceLevelText = document.getElementById("clearance-level");
+
+// Tab Navigation
+navItems.forEach(item => {
+  item.addEventListener("click", () => {
+    navItems.forEach(i => i.classList.remove("active"));
+    tabViews.forEach(v => v.classList.remove("active"));
+    
+    item.classList.add("active");
+    const targetTab = item.getAttribute("data-tab");
+    document.getElementById(`tab-${targetTab}`).classList.add("active");
+    
+    updateHeaderMetadata(targetTab);
+  });
+});
+
+function updateHeaderMetadata(tab) {
+  const metadata = {
+    profile: {
+      title: "Rig Configuration",
+      subtitle: "Configure your tow vehicle and trailer specifications for safe navigation."
+    },
+    wizard: {
+      title: "Systematic Scouting Wizard",
+      subtitle: "Execute the critical 4-step dual-app safety scouting workflow."
+    },
+    roads: {
+      title: "Forest Roads Explorer",
+      subtitle: "Vetted trails and access corridors around Bellemont & Wing Mountain."
+    },
+    dumps: {
+      title: "Dump & Water Stations",
+      subtitle: "Locate crowdsourced dump stations and potable water fill stations."
+    },
+    calculator: {
+      title: "Clearance & Turn Calculators",
+      subtitle: "Ensure your trailer length and clearance aren't at risk of high-centering."
+    },
+    logger: {
+      title: "Spot Logger & Exporter",
+      subtitle: "Log coordinates and field data of scouted locations for offline recall."
+    }
+  };
+  
+  if (metadata[tab]) {
+    pageTitle.textContent = metadata[tab].title;
+    pageSubtitle.textContent = metadata[tab].subtitle;
+  }
+}
+
+// Rig Profile Functionality
+function updateRigUI() {
+  pillLength.textContent = `${rigProfile.length} ft`;
+  pillClearance.textContent = `${rigProfile.clearance} in`;
+  
+  // Update Visualizer Size
+  // Map length 10-85 to 60px-240px width
+  const visualWidth = 60 + ((rigProfile.length - 10) / (85 - 10)) * 180;
+  visualTrailer.style.width = `${visualWidth}px`;
+  visualLengthText.textContent = `${rigProfile.length}ft`;
+  
+  // Update placeholders in Wizard
+  document.querySelectorAll(".rig-len-ph").forEach(span => {
+    span.textContent = rigProfile.length;
+  });
+
+  // Calculate Threat Levels
+  if (rigProfile.length > 50) {
+    threatLevelText.textContent = "CRITICAL (Turnarounds Rare)";
+    threatLevelText.style.color = "var(--danger)";
+  } else if (rigProfile.length > 35) {
+    threatLevelText.textContent = "Medium (Check Satellite)";
+    threatLevelText.style.color = "var(--warning)";
+  } else {
+    threatLevelText.textContent = "Low (Highly Maneuverable)";
+    threatLevelText.style.color = "var(--primary)";
+  }
+
+  if (rigProfile.clearance < 8) {
+    clearanceLevelText.textContent = "HIGH (Washout Risk)";
+    clearanceLevelText.style.color = "var(--danger)";
+  } else if (rigProfile.clearance < 11) {
+    clearanceLevelText.textContent = "Standard";
+    clearanceLevelText.style.color = "var(--warning)";
+  } else {
+    clearanceLevelText.textContent = "Off-Road Ready";
+    clearanceLevelText.style.color = "var(--primary)";
+  }
+
+  // Refresh lists to highlight compatibility
+  renderRoadsList();
+  calculateCalculators();
+}
+
+rigForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  rigProfile.length = parseInt(rigLengthInput.value);
+  rigProfile.clearance = parseInt(rigClearanceInput.value);
+  rigProfile.wheelbase = parseInt(rigWheelbaseInput.value);
+  rigProfile.carrier = rigCarrierSelect.value;
+  
+  localStorage.setItem("rv_boondock_rig", JSON.stringify(rigProfile));
+  updateRigUI();
+});
+
+// Load saved profile
+function loadRigProfile() {
+  const saved = localStorage.getItem("rv_boondock_rig");
+  if (saved) {
+    rigProfile = JSON.parse(saved);
+    rigLengthInput.value = rigProfile.length;
+    rigClearanceInput.value = rigProfile.clearance;
+    rigWheelbaseInput.value = rigProfile.wheelbase;
+    rigCarrierSelect.value = rigProfile.carrier;
+  }
+  updateRigUI();
+}
+
+// Wizard Setup
+const stepProgress = document.querySelectorAll(".progress-step");
+const stepContents = document.querySelectorAll(".step-content");
+const btnPrev = document.getElementById("wizard-prev");
+const btnNext = document.getElementById("wizard-next-btn");
+
+function updateWizardUI() {
+  stepContents.forEach(step => step.classList.add("hidden"));
+  document.getElementById(`step-${currentWizardStep}`).classList.remove("hidden");
+  
+  stepProgress.forEach(step => {
+    const stepNum = parseInt(step.getAttribute("data-step"));
+    step.classList.remove("active", "completed");
+    if (stepNum === currentWizardStep) {
+      step.classList.add("active");
+    } else if (stepNum < currentWizardStep) {
+      step.classList.add("completed");
+    }
+  });
+
+  btnPrev.disabled = currentWizardStep === 1;
+  btnNext.textContent = currentWizardStep === 4 ? "Restart Wizard" : "Next Step";
+}
+
+btnNext.addEventListener("click", () => {
+  if (currentWizardStep === 4) {
+    currentWizardStep = 1;
+    // Clear all wizard checkboxes
+    document.querySelectorAll(".wizard-check").forEach(c => c.checked = false);
+  } else {
+    currentWizardStep++;
+  }
+  updateWizardUI();
+});
+
+btnPrev.addEventListener("click", () => {
+  if (currentWizardStep > 1) {
+    currentWizardStep--;
+    updateWizardUI();
+  }
+});
+
+// Render Forest Roads List
+function renderRoadsList() {
+  const list = document.getElementById("roads-list");
+  list.innerHTML = "";
+  
+  FOREST_ROADS.forEach(road => {
+    // Check compatibility based on rig length and clearance
+    let statusClass = "status-safe";
+    let statusText = "COMPATIBLE";
+    
+    if (rigProfile.length > road.maxLength || rigProfile.clearance < road.minClearance) {
+      statusClass = "status-danger";
+      statusText = "DANGEROUS";
+    } else if (rigProfile.length > road.maxLength - 10) {
+      statusClass = "status-warning";
+      statusText = "CAUTION REQUIRED";
+    }
+
+    const carrierVal = road.cellSignal[rigProfile.carrier];
+    const carrierLabel = rigProfile.carrier.toUpperCase();
+
+    const card = document.createElement("div");
+    card.className = "road-card glass";
+    card.innerHTML = `
+      <div>
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="road-number">${road.number}</span>
+            <h3>${road.name}</h3>
+          </div>
+          <span class="status-badge ${statusClass}">${statusText}</span>
+        </div>
+        <div class="card-body">
+          <div class="card-stat">
+            <span class="card-stat-label">Max Safe Length:</span>
+            <span class="card-stat-val">${road.maxLength} ft</span>
+          </div>
+          <div class="card-stat">
+            <span class="card-stat-label">Min Ground Clearance:</span>
+            <span class="card-stat-val">${road.minClearance} in</span>
+          </div>
+          <div class="card-stat">
+            <span class="card-stat-label">Grade Severity:</span>
+            <span class="card-stat-val">${road.difficulty}</span>
+          </div>
+          <div class="card-stat">
+            <span class="card-stat-label">${carrierLabel} Office Signal:</span>
+            <span class="card-stat-val">${"★".repeat(carrierVal)}${"☆".repeat(5 - carrierVal)}</span>
+          </div>
+          <p class="card-description"><strong>Road Grade:</strong> ${road.roadGrade}</p>
+          <p class="card-description"><strong>Turnaround:</strong> ${road.turnaround}</p>
+        </div>
+      </div>
+      <div class="btn-group">
+        <a href="${road.satelliteLink}" target="_blank" class="btn primary-btn mini-btn">Ground Truth Check ↗</a>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+// Render Dump Stations
+function renderDumpList() {
+  const list = document.getElementById("dumps-list");
+  list.innerHTML = "";
+  
+  DUMP_STATIONS.forEach(dump => {
+    const card = document.createElement("div");
+    card.className = "dump-card glass";
+    card.innerHTML = `
+      <div>
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="road-number">${dump.location}</span>
+            <h3>${dump.name}</h3>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-stat">
+            <span class="card-stat-label">Transit Distance:</span>
+            <span class="card-stat-val">${dump.distance}</span>
+          </div>
+          <div class="card-stat">
+            <span class="card-stat-label">Sanidump Fee:</span>
+            <span class="card-stat-val">${dump.fee}</span>
+          </div>
+          <div class="card-stat">
+            <span class="card-stat-label">Potable Water:</span>
+            <span class="card-stat-val">${dump.water}</span>
+          </div>
+          <div class="card-stat">
+            <span class="card-stat-label">Rig Access:</span>
+            <span class="card-stat-val">${dump.access}</span>
+          </div>
+          <p class="card-description"><strong>Seasonality:</strong> ${dump.status}</p>
+        </div>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+// Safety Calculators Setup
+const calcRoadWidth = document.getElementById("calc-road-width");
+const calcTurnAngle = document.getElementById("calc-turn-angle");
+const turnOutput = document.getElementById("turn-output");
+
+const calcWashoutDepth = document.getElementById("calc-washout-depth");
+const calcWashoutWidth = document.getElementById("calc-washout-width");
+const clearanceOutput = document.getElementById("clearance-output");
+
+function calculateCalculators() {
+  // 1. Turning radius check
+  const w = parseFloat(calcRoadWidth.value) || 12;
+  const a = parseFloat(calcTurnAngle.value) || 90;
+  
+  // Approximate offtracking: OT = (Wheelbase^2) / (2 * turning radius)
+  // Let's assume a reasonable turning radius of the tow vehicle itself.
+  // For standard trucks, radius is approx 25ft to negotiate a 90 deg turn.
+  // If the road width is very narrow, the radius is constrained.
+  const estRadius = w * 1.5;
+  const offTracking = (Math.pow(rigProfile.wheelbase, 2)) / (2 * estRadius) * (a / 90);
+  const totalRequiredWidth = 8.5 + offTracking; // 8.5ft is standard rig width
+  
+  let turnStatus = "COMPATIBLE";
+  let turnColor = "var(--primary)";
+  let turnDesc = `Your configuration requires approximately <strong>${totalRequiredWidth.toFixed(1)} ft</strong> of roadway width to complete this ${a}deg turn. Since the road is ${w}ft wide, you have adequate clearance.`;
+
+  if (totalRequiredWidth > w) {
+    turnStatus = "CRITICAL (Jackknife Risk)";
+    turnColor = "var(--danger)";
+    turnDesc = `High risk of trailer tires leaving the road track or your truck jackknifing. Your rig needs at least <strong>${totalRequiredWidth.toFixed(1)} ft</strong> of width for a ${a}deg turn. Scout this section on foot first.`;
+  } else if (totalRequiredWidth > w - 2) {
+    turnStatus = "CAUTION (Tight Squeeze)";
+    turnColor = "var(--warning)";
+    turnDesc = `Narrow fit. You require <strong>${totalRequiredWidth.toFixed(1)} ft</strong> of the ${w}ft available road. Maintain slow speeds and check your mirror for trailer off-tracking.`;
+  }
+
+  turnOutput.innerHTML = `
+    <div class="calc-result-title" style="color: ${turnColor}">
+      <span>●</span> ${turnStatus}
+    </div>
+    <p class="calc-result-desc">${turnDesc}</p>
+  `;
+
+  // 2. High centering check
+  const d = parseFloat(calcWashoutDepth.value) || 0;
+  const s = parseFloat(calcWashoutWidth.value) || 10;
+
+  // Simplistic high centering model:
+  // If the washout forms a V with width S and depth D.
+  // Maximum ground clearance threat occurs when the trailer tires are on the crest and the bumper is in the dip,
+  // or when the vehicle tires are on both crests and the trailer center hangs over the apex.
+  // Clearance requirement at center: H = (D * (wheelbase / 2)) / (s / 2) = (D * wheelbase) / s
+  const requiredClearance = (d * rigProfile.wheelbase) / s;
+
+  let clearStatus = "COMPATIBLE";
+  let clearColor = "var(--primary)";
+  let clearDesc = `Calculated high-center clearance demand is <strong>${requiredClearance.toFixed(1)} inches</strong>. Your rig has ${rigProfile.clearance} inches of clearance, leaving a safe buffer.`;
+
+  if (requiredClearance >= rigProfile.clearance) {
+    clearStatus = "CRITICAL HAZARD";
+    clearColor = "var(--danger)";
+    clearDesc = `Your plumbing or frame is highly likely to scrape or hang up on this washout. The transition requires at least <strong>${requiredClearance.toFixed(1)} inches</strong> of clearance, exceeding your rig's ${rigProfile.clearance} inches.`;
+  } else if (requiredClearance >= rigProfile.clearance - 3) {
+    clearStatus = "CAUTION (Low Clearance)";
+    clearColor = "var(--warning)";
+    clearDesc = `Tight clearance transition. The washout requires <strong>${requiredClearance.toFixed(1)} inches</strong> of your ${rigProfile.clearance} inch limit. Traverse at an angle to prevent bottoming out.`;
+  }
+
+  clearanceOutput.innerHTML = `
+    <div class="calc-result-title" style="color: ${clearColor}">
+      <span>●</span> ${clearStatus}
+    </div>
+    <p class="calc-result-desc">${clearDesc}</p>
+  `;
+}
+
+[calcRoadWidth, calcTurnAngle, calcWashoutDepth, calcWashoutWidth].forEach(el => {
+  el.addEventListener("input", calculateCalculators);
+});
+
+// Spot Logger Logic
+const logRoadSelect = document.getElementById("log-road");
+const logDumpSelect = document.getElementById("log-dump");
+const logForm = document.getElementById("spot-logger-form");
+const logList = document.getElementById("logged-spots-list");
+
+function initLoggerSelects() {
+  logRoadSelect.innerHTML = FOREST_ROADS.map(r => `<option value="${r.id}">${r.number} - ${r.name}</option>`).join("");
+  logDumpSelect.innerHTML = DUMP_STATIONS.map(d => `<option value="${d.name}">${d.name} (${d.fee})</option>`).join("");
+}
+
+logForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const roadId = logRoadSelect.value;
+  const road = FOREST_ROADS.find(r => r.id === roadId);
+  
+  const newSpot = {
+    id: Date.now().toString(),
+    roadName: road.name,
+    roadNumber: road.number,
+    coords: document.getElementById("log-coords").value,
+    signal: parseInt(document.getElementById("log-signal").value),
+    dumpStation: logDumpSelect.value,
+    notes: document.getElementById("log-notes").value,
+    timestamp: new Date().toLocaleDateString()
+  };
+
+  loggedSpots.unshift(newSpot);
+  localStorage.setItem("rv_boondock_spots", JSON.stringify(loggedSpots));
+  renderLoggedSpots();
+  logForm.reset();
+  initLoggerSelects();
+});
+
+function renderLoggedSpots() {
+  logList.innerHTML = "";
+  if (loggedSpots.length === 0) {
+    logList.innerHTML = `<p style="color: var(--text-muted); font-size: 0.85rem; text-align: center; margin-top: 2rem;">No spots logged yet. Go scout some trails!</p>`;
+    return;
+  }
+
+  loggedSpots.forEach(spot => {
+    const item = document.createElement("div");
+    item.className = "logged-item";
+    item.innerHTML = `
+      <div class="logged-item-header">
+        <span class="logged-road-name">${spot.roadNumber} - ${spot.roadName}</span>
+        <span class="logged-time">${spot.timestamp}</span>
+      </div>
+      <div class="logged-details">
+        <div><strong>Coordinates:</strong> ${spot.coords}</div>
+        <div><strong>Cell Signal:</strong> ${"★".repeat(spot.signal)}${"☆".repeat(5 - spot.signal)}</div>
+        <div><strong>Closest Dump Station:</strong> ${spot.dumpStation}</div>
+        <p class="logged-notes">"${spot.notes}"</p>
+      </div>
+      <div class="logged-item-actions">
+        <button class="btn primary-btn mini-btn" onclick="exportSpot('${spot.id}')">Export MD</button>
+        <button class="btn secondary-btn mini-btn" onclick="deleteSpot('${spot.id}')" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.2)">Delete</button>
+      </div>
+    `;
+    logList.appendChild(item);
+  });
+}
+
+window.deleteSpot = function(id) {
+  loggedSpots = loggedSpots.filter(s => s.id !== id);
+  localStorage.setItem("rv_boondock_spots", JSON.stringify(loggedSpots));
+  renderLoggedSpots();
+};
+
+window.exportSpot = function(id) {
+  const spot = loggedSpots.find(s => s.id === id);
+  if (!spot) return;
+
+  const md = `# Scouted Site: ${spot.roadNumber} - ${spot.roadName}
+* **Logged Date:** ${spot.timestamp}
+* **Coordinates:** ${spot.coords}
+* **Cell Signal:** ${spot.signal}/5 Stars (carrier adjusted)
+* **Closest Checked Dump Station:** ${spot.dumpStation}
+
+## Field Assessment & Obstacle Notes
+> ${spot.notes}
+
+---
+*Generated by RVBoondock Bellemont & Wing Mountain Scout App*`;
+
+  const blob = new Blob([md], { type: "text/markdown;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Scouted-Site-${spot.roadNumber.replace(" ", "-")}-${spot.id}.md`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+};
+
+// Initializer
+function init() {
+  loadRigProfile();
+  initLoggerSelects();
+  
+  const savedSpots = localStorage.getItem("rv_boondock_spots");
+  if (savedSpots) {
+    loggedSpots = JSON.parse(savedSpots);
+  }
+  renderLoggedSpots();
+  
+  renderRoadsList();
+  renderDumpList();
+  updateWizardUI();
+}
+
+window.addEventListener("DOMContentLoaded", init);
