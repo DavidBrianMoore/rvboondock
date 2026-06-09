@@ -110,16 +110,23 @@
 
             <div class="card glass flex-center flex-column">
               <h3>Interactive Rig Preview</h3>
-              <div class="rig-visualizer">
+              <div class="rig-visualizer flex-column">
                 <div class="visualizer-wrapper">
-                  <div class="truck-box">Truck</div>
+                  <div class="truck-box"><span class="truck-label">Truck (18ft)</span></div>
                   <div class="hitch-line"></div>
                   <div class="trailer-box" id="visual-trailer">
-                    <span class="trailer-label" id="visual-length-text">45ft</span>
+                    <span class="trailer-label" id="visual-length-text">Trailer (27ft)</span>
                     <div class="wheels"></div>
                   </div>
                 </div>
                 <div class="ground-line"></div>
+                <div class="dimension-line">
+                  <div class="dim-arrow-left"></div>
+                  <div class="dim-line"></div>
+                  <span class="dim-label" id="visual-total-text">Total: 45ft</span>
+                  <div class="dim-line"></div>
+                  <div class="dim-arrow-right"></div>
+                </div>
               </div>
               <div class="dimension-feedback">
                 <div class="feedback-item">

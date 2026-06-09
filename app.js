@@ -177,10 +177,20 @@ function updateRigUI() {
   pillClearance.textContent = `${rigProfile.clearance} in`;
   
   // Update Visualizer Size
-  // Map length 10-85 to 60px-240px width
-  const visualWidth = 60 + ((rigProfile.length - 10) / (85 - 10)) * 180;
+  // Assume standard truck is 18ft. Trailer is total length - 18ft.
+  const truckLength = 18;
+  const trailerLength = Math.max(5, rigProfile.length - truckLength);
+  
+  // Map trailer length (5-67ft) to 60px-240px width
+  const visualWidth = 60 + ((trailerLength - 5) / (67 - 5)) * 180;
   visualTrailer.style.width = `${visualWidth}px`;
-  visualLengthText.textContent = `${rigProfile.length}ft`;
+  
+  visualLengthText.textContent = `Trailer (${trailerLength}ft)`;
+  
+  const visualTotalText = document.getElementById("visual-total-text");
+  if (visualTotalText) {
+    visualTotalText.textContent = `Total Combined: ${rigProfile.length}ft`;
+  }
   
   // Update placeholders in Wizard
   document.querySelectorAll(".rig-len-ph").forEach(span => {
