@@ -197,8 +197,16 @@ function syncCurrentGPS() {
   btnSyncGps.textContent = "Locating...";
   btnSyncGps.disabled = true;
 
+  // Safety timer to prevent button from getting stuck if iOS Safari blocks the prompt
+  const safetyTimeout = setTimeout(() => {
+    alert("GPS Request Timed Out.\n\nTo allow GPS access on your iPhone:\n1. Open iPhone Settings -> Privacy & Security -> Location Services (Turn ON).\n2. Ensure Safari Website access is allowed location permissions.\n3. Make sure you select 'Allow' when the browser prompts you.");
+    btnSyncGps.textContent = "Sync GPS";
+    btnSyncGps.disabled = false;
+  }, 10000); // 10 seconds limit
+
   navigator.geolocation.getCurrentPosition(
     (position) => {
+      clearTimeout(safetyTimeout); // Clear safety timer on success
       const coords = {
         lat: position.coords.latitude,
         lng: position.coords.longitude,
@@ -237,11 +245,12 @@ function syncCurrentGPS() {
       }
     },
     (error) => {
+      clearTimeout(safetyTimeout); // Clear safety timer on error
       alert(`Error getting location (Code ${error.code}): ${error.message}\nTry moving closer to a window or checking Safari Location permissions in settings.`);
       btnSyncGps.textContent = "Sync GPS";
       btnSyncGps.disabled = false;
     },
-    { enableHighAccuracy: false, timeout: 12000, maximumAge: 10000 }
+    { enableHighAccuracy: false, timeout: 8000, maximumAge: 10000 }
   );
 }
 
