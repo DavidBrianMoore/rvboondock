@@ -135,7 +135,7 @@ let loggedSpots = [];
 let currentWizardStep = 1;
 
 // Firebase / Shared Location state
-const db = typeof firebase !== 'undefined' ? firebase.firestore() : null;
+const db = (typeof firebase !== 'undefined' && typeof firebase.firestore === 'function') ? firebase.firestore() : null;
 let userLocation = null; // { lat, lng, timestamp }
 
 // Elements
