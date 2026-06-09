@@ -56,17 +56,6 @@ const FOREST_ROADS = [
 
 const DUMP_STATIONS = [
   {
-    name: "Pine View RV Park",
-    location: "Bellemont, AZ (Exit 185)",
-    address: "1 Hughes Ave, Bellemont, AZ 86015",
-    phone: "(928) 699-8866",
-    distance: "3 miles from FR 222 entrance",
-    fee: "$15 (non-guest rate)",
-    water: "Potable water fill included",
-    access: "Easy access for trailers and big rigs",
-    status: "Open seasonal (typically April to November)"
-  },
-  {
     name: "Black Bart's RV Park",
     location: "Flagstaff, AZ (Exit 198)",
     address: "2760 E Butler Ave, Flagstaff, AZ 86004",
@@ -75,7 +64,8 @@ const DUMP_STATIONS = [
     fee: "$20",
     water: "Potable water fill included",
     access: "Commercial paved layout, big rig friendly",
-    status: "Open year-round"
+    status: "Open year-round",
+    public: true
   },
   {
     name: "Fort Tuthill County Campground",
@@ -86,7 +76,8 @@ const DUMP_STATIONS = [
     fee: "$10",
     water: "Potable water fill included",
     access: "Good gravel access lane",
-    status: "Open mid-April to mid-October"
+    status: "Open mid-April to mid-October",
+    public: true
   },
   {
     name: "Maverik Adventure First Stop",
@@ -97,7 +88,21 @@ const DUMP_STATIONS = [
     fee: "$10 (Rinse water only)",
     water: "No potable water at dump island",
     access: "Tight commercial layout, best for sub-30ft rigs",
-    status: "Open year-round"
+    status: "Open year-round",
+    public: true
+  },
+  {
+    name: "Pine View RV Park (Camp Navajo)",
+    location: "Bellemont, AZ (Exit 185)",
+    address: "1 Hughes Ave, Bellemont, AZ 86015",
+    phone: "(928) 699-8866",
+    distance: "3 miles from FR 222 entrance",
+    fee: "$15 (non-guest rate)",
+    water: "Potable water fill included",
+    access: "Easy access for trailers and big rigs",
+    status: "Open seasonal (typically April to November)",
+    public: false,
+    restriction: "Military / Authorized Personnel Only"
   }
 ];
 
@@ -372,15 +377,30 @@ function renderDumpList() {
 
     const card = document.createElement("div");
     card.className = "dump-card glass";
+    
+    let restrictionBadge = "";
+    if (dump.public === false) {
+      card.style.borderColor = "rgba(239, 68, 68, 0.35)";
+      restrictionBadge = `<span class="status-badge status-danger" style="margin-top: 0.4rem; display: inline-block;">MILITARY ONLY</span>`;
+    } else {
+      restrictionBadge = `<span class="status-badge status-safe" style="margin-top: 0.4rem; display: inline-block;">OPEN TO PUBLIC</span>`;
+    }
+
     card.innerHTML = `
       <div>
-        <div class="card-header">
-          <div class="card-title-group">
+        <div class="card-header" style="flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+          <div class="card-title-group" style="width: 100%;">
             <span class="road-number">${dump.location}</span>
-            <h3>${dump.name}</h3>
+            <h3 style="margin-top: 0.2rem;">${dump.name}</h3>
           </div>
+          ${restrictionBadge}
         </div>
         <div class="card-body">
+          ${dump.restriction ? `
+          <div class="card-stat" style="border-bottom-color: rgba(239, 68, 68, 0.15); padding-bottom: 0.4rem;">
+            <span class="card-stat-label" style="color: var(--danger)">Restriction:</span>
+            <span class="card-stat-val" style="color: var(--danger); font-weight: 700;">${dump.restriction}</span>
+          </div>` : ""}
           <div class="card-stat">
             <span class="card-stat-label">Address:</span>
             <span class="card-stat-val text-right">${dump.address}</span>
