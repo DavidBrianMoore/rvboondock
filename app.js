@@ -90,19 +90,6 @@ const DUMP_STATIONS = [
     access: "Tight commercial layout, best for sub-30ft rigs",
     status: "Open year-round",
     public: true
-  },
-  {
-    name: "Pine View RV Park (Camp Navajo)",
-    location: "Bellemont, AZ (Exit 185)",
-    address: "1 Hughes Ave, Bellemont, AZ 86015",
-    phone: "(928) 699-8866",
-    distance: "3 miles from FR 222 entrance",
-    fee: "$15 (non-guest rate)",
-    water: "Potable water fill included",
-    access: "Easy access for trailers and big rigs",
-    status: "Open seasonal (typically April to November)",
-    public: false,
-    restriction: "Military / Authorized Personnel Only"
   }
 ];
 
