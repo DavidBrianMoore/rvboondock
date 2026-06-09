@@ -136,7 +136,7 @@ let loggedSpots = [];
 let currentWizardStep = 1;
 
 // Firebase / Shared Location state
-const db = (typeof firebase !== 'undefined' && typeof firebase.firestore === 'function') ? firebase.firestore() : null;
+let db = null;
 let userLocation = null; // { lat, lng, timestamp }
 
 // Elements
@@ -773,6 +773,9 @@ window.exportSpot = function(id) {
 
 // Initializer
 function init() {
+  if (typeof firebase !== 'undefined' && typeof firebase.firestore === 'function') {
+    db = firebase.firestore();
+  }
   loadRigProfile();
   initLoggerSelects();
   
