@@ -224,6 +224,7 @@ function syncCurrentGPS() {
           }, 1500);
         }).catch(err => {
           console.error("Firestore sync error:", err);
+          alert(`Database sync failed: ${err.message}`);
           btnSyncGps.textContent = "Sync GPS";
           btnSyncGps.disabled = false;
         });
@@ -236,11 +237,11 @@ function syncCurrentGPS() {
       }
     },
     (error) => {
-      alert(`Error getting location: ${error.message}`);
+      alert(`Error getting location (Code ${error.code}): ${error.message}\nTry moving closer to a window or checking Safari Location permissions in settings.`);
       btnSyncGps.textContent = "Sync GPS";
       btnSyncGps.disabled = false;
     },
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    { enableHighAccuracy: false, timeout: 12000, maximumAge: 10000 }
   );
 }
 
