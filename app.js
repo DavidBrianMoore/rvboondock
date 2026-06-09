@@ -145,6 +145,7 @@ const pageTitle = document.getElementById("page-title");
 const pageSubtitle = document.getElementById("page-subtitle");
 const pillCoords = document.getElementById("pill-coords");
 const btnSyncGps = document.getElementById("btn-sync-gps");
+const gpsTracker = document.getElementById("gps-tracker");
 
 const rigForm = document.getElementById("rig-form");
 const rigLengthInput = document.getElementById("rig-length");
@@ -176,7 +177,12 @@ function updateLocationPill() {
   if (userLocation) {
     const timeStr = userLocation.timestamp ? new Date(userLocation.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Just now';
     pillCoords.textContent = `${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)} (${timeStr})`;
-    pillCoords.parentElement.style.background = "rgba(16, 185, 129, 0.15)";
+    
+    if (gpsTracker) {
+      gpsTracker.classList.remove("flash-success");
+      void gpsTracker.offsetWidth; // Trigger reflow to restart animation
+      gpsTracker.classList.add("flash-success");
+    }
   } else {
     pillCoords.textContent = "Offline / No GPS";
   }
