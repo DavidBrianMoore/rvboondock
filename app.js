@@ -123,6 +123,7 @@ const DUMP_STATIONS = [
   }
 ];
 
+try {
 // App State Management
 let rigProfile = {
   length: 45,
@@ -822,3 +823,6 @@ function init() {
 }
 
 window.addEventListener("DOMContentLoaded", init);
+} catch (globalInitError) {
+  alert("CRITICAL APP INITIALIZATION ERROR:\n" + globalInitError.message + "\n\nStack:\n" + globalInitError.stack);
+}
