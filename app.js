@@ -189,6 +189,7 @@ function updateLocationPill() {
 }
 
 function syncCurrentGPS() {
+  alert("GPS Sync Initiated!");
   if (!navigator.geolocation) {
     alert("Geolocation is not supported by your browser/device.");
     return;
@@ -255,6 +256,7 @@ function syncCurrentGPS() {
 }
 
 btnSyncGps.addEventListener("click", syncCurrentGPS);
+window.syncCurrentGPS = syncCurrentGPS;
 
 // Tab Navigation
 navItems.forEach(item => {

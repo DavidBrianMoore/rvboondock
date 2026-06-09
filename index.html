@@ -25,7 +25,7 @@
         <h1>RVBOONDOCK</h1>
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem;">
           <span class="badge">Bellemont / Wing Mtn</span>
-          <span class="badge" id="app-version" style="background: rgba(56, 189, 248, 0.1); color: var(--accent); border-color: rgba(56, 189, 248, 0.25);">v1.0.20260609.1322</span>
+          <span class="badge" id="app-version" style="background: rgba(56, 189, 248, 0.1); color: var(--accent); border-color: rgba(56, 189, 248, 0.25);">v1.0.20260609.1325</span>
         </div>
       </div>
       
@@ -73,7 +73,7 @@
           <div class="stat-pill gps-pill" id="gps-tracker">
             <span class="stat-label">📍 Location:</span>
             <span class="stat-value" id="pill-coords">Offline / No GPS</span>
-            <button class="gps-btn" id="btn-sync-gps" title="Sync current GPS to database">Sync GPS</button>
+            <button class="gps-btn" id="btn-sync-gps" onclick="syncCurrentGPS()" title="Sync current GPS to database">Sync GPS</button>
           </div>
           <div class="stat-pill">
             <span class="stat-label">Total Length:</span>
