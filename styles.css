@@ -1146,3 +1146,49 @@ textarea:focus {
   }
 }
 
+/* Modal and Campsite Scouting Creator Styles */
+.modal-overlay:not(.hidden) {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.star-btn {
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.star-btn:hover {
+  transform: scale(1.25);
+  color: var(--warning) !important;
+}
+
+.amenity-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  transition: var(--transition);
+}
+
+.amenity-tag-pill:hover {
+  border-color: var(--border-focus);
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.amenity-tag-pill.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg-darker);
+  font-weight: 700;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+}
+
+

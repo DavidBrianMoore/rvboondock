@@ -32,17 +32,17 @@
       </div>
       
       <nav class="nav-menu">
-        <button class="nav-item active" data-tab="profile">
+        <button class="nav-item active" data-tab="map">
+          <span class="nav-icon">🗺️</span>
+          <span class="nav-label">Interactive Map</span>
+        </button>
+        <button class="nav-item" data-tab="profile">
           <span class="nav-icon">🚚</span>
           <span class="nav-label">Rig Profile</span>
         </button>
         <button class="nav-item" data-tab="wizard">
           <span class="nav-icon">📝</span>
           <span class="nav-label">Scouting Wizard</span>
-        </button>
-        <button class="nav-item" data-tab="map">
-          <span class="nav-icon">🗺️</span>
-          <span class="nav-label">Interactive Map</span>
         </button>
         <button class="nav-item" data-tab="transit">
           <span class="nav-icon">🛣️</span>
@@ -76,8 +76,8 @@
       <!-- Top Stats Bar -->
       <header class="top-header">
         <div class="header-title">
-          <h2 id="page-title">Rig Configuration</h2>
-          <p id="page-subtitle">Configure your tow vehicle and trailer specifications for safe navigation.</p>
+          <h2 id="page-title">Interactive Mapping Center</h2>
+          <p id="page-subtitle">Toggle terrain and satellite layers to scout roads, dumps, and logged spots.</p>
         </div>
         <div class="quick-rig-status">
           <div class="stat-pill gps-pill" id="gps-tracker">
@@ -100,7 +100,7 @@
       <div class="content-body">
         
         <!-- Tab: Rig Profile -->
-        <section id="tab-profile" class="tab-view active">
+        <section id="tab-profile" class="tab-view">
           <div class="grid-2col">
             <div class="card glass">
               <h3>Rig Dimensions</h3>
@@ -309,10 +309,18 @@
         </section>
 
         <!-- Tab: Interactive Map -->
-        <section id="tab-map" class="tab-view">
+        <section id="tab-map" class="tab-view active">
           <div class="grid-2col" style="grid-template-columns: 2.5fr 1fr; gap: 1.5rem; height: calc(100vh - 180px); min-height: 580px;">
             <!-- Map Canvas Container -->
             <div class="card glass" style="padding: 0; position: relative; display: flex; flex-direction: column; overflow: hidden; height: 100%;">
+              <!-- Staged Queue Alert Banner (GasBuddy style) -->
+              <div id="scouting-status-bar" class="alert-banner info-banner" style="position: absolute; top: 12px; left: 12px; right: 12px; z-index: 1000; margin-bottom: 0; padding: 0.75rem 1rem; border-radius: 8px; backdrop-filter: blur(8px); background: rgba(14, 165, 233, 0.15); display: none; align-items: center; justify-content: space-between; border-color: rgba(14, 165, 233, 0.35);">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span style="font-size: 1.1rem;">📝</span>
+                  <span id="scouting-status-text" style="font-size: 0.85rem; font-weight: 500; color: var(--text-main);">You have 0 staged campsite pins. Claim a spot to publish them!</span>
+                </div>
+                <button id="btn-claim-camp-wizard" class="btn primary-btn mini-btn" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; background: var(--primary); border: none; font-weight: 700;">Claim Site & Setup Camp</button>
+              </div>
               <div id="interactive-map-canvas" style="flex-grow: 1; width: 100%; height: 100%; z-index: 1;"></div>
             </div>
 
@@ -551,6 +559,70 @@
     </main>
   </div>
   
+  <!-- Campsite Creator Modal -->
+  <div id="modal-camp-creator" class="modal-overlay hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(4, 6, 12, 0.85); backdrop-filter: blur(8px); z-index: 9999; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: all 0.3s ease;">
+    <div class="card glass" style="width: 90%; max-width: 480px; padding: 2rem; position: relative; max-height: 90vh; overflow-y: auto;">
+      <h3 style="margin-bottom: 1.25rem; border-left-color: var(--accent);">Scout Campsite</h3>
+      <button id="btn-close-camp-modal" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; color: var(--text-muted); font-size: 1.75rem; cursor: pointer; line-height: 1; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-muted)'">&times;</button>
+      
+      <form id="camp-creator-form">
+        <!-- Hidden input for coordinates -->
+        <input type="hidden" id="camp-coords">
+        
+        <!-- Status Radio buttons -->
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label style="margin-bottom: 0.5rem; display: block; font-weight: 600; font-size: 0.9rem;">Campsite Status</label>
+          <div style="display: flex; gap: 1.5rem;">
+            <label class="check-item" style="font-weight: 500; cursor: pointer;">
+              <input type="radio" name="camp-status" value="available" checked style="margin-right: 0.4rem; accent-color: var(--primary);">
+              <span style="color: var(--primary); font-weight: 700;">🟢 Available (Staged)</span>
+            </label>
+            <label class="check-item" style="font-weight: 500; cursor: pointer;">
+              <input type="radio" name="camp-status" value="occupied" style="margin-right: 0.4rem; accent-color: var(--danger);">
+              <span style="color: var(--danger); font-weight: 700;">🔴 Occupied</span>
+            </label>
+          </div>
+          <span class="input-desc">Marking 'Available' stages this campsite privately until you claim a spot.</span>
+        </div>
+
+        <!-- Star Rating -->
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label style="margin-bottom: 0.25rem; display: block; font-weight: 600; font-size: 0.9rem;">Site Quality Rating</label>
+          <div class="star-rating-selector" id="camp-star-selector" style="display: flex; gap: 0.5rem; font-size: 1.8rem; color: var(--text-muted); cursor: pointer; user-select: none;">
+            <span data-value="1" class="star-btn">★</span>
+            <span data-value="2" class="star-btn">★</span>
+            <span data-value="3" class="star-btn" style="color: var(--warning);">★</span>
+            <span data-value="4" class="star-btn" style="color: var(--warning);">★</span>
+            <span data-value="5" class="star-btn" style="color: var(--warning);">★</span>
+          </div>
+          <input type="hidden" id="camp-rating" value="3">
+        </div>
+
+        <!-- Quick Mark Amenities -->
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label style="margin-bottom: 0.5rem; display: block; font-weight: 600; font-size: 0.9rem;">Quick Amenities</label>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;" id="camp-amenities-tags">
+            <span class="amenity-tag-pill" data-val="shade">🌲 Shade Canopy</span>
+            <span class="amenity-tag-pill" data-val="solar">☀️ Solar Friendly</span>
+            <span class="amenity-tag-pill" data-val="flat">📏 Level Pad</span>
+            <span class="amenity-tag-pill" data-val="signal">📶 Cell Signal</span>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+          <label for="camp-notes" style="font-weight: 600; font-size: 0.9rem;">Scouting Assessment Notes</label>
+          <textarea id="camp-notes" rows="3" placeholder="Describe access tracks, fire pits, level status, or clearance concerns..." required style="width: 100%; border-radius: 8px; resize: none;"></textarea>
+        </div>
+
+        <div style="display: flex; gap: 1rem;">
+          <button type="submit" class="btn primary-btn" style="flex: 1; font-weight: 700;">Save Site</button>
+          <button type="button" id="btn-cancel-camp-modal" class="btn secondary-btn" style="flex: 1;">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- app logic (Firebase is loaded dynamically in-app) -->
   <script src="/app.js"></script>
 </body>

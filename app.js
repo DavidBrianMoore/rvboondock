@@ -1146,6 +1146,10 @@ let leafletMarkers = [];
 let googleMarkersArray = [];
 let currentTileLayer = null;
 
+// Campsite Scouting & Staged Queue State
+let stagedCampsites = [];
+let sharedCampsites = []; // Loaded from Firestore/shared DB
+
 // DOM Elements for Map Tab
 let googleApiKeyInput = null;
 let btnSaveApiKey = null;
@@ -1156,6 +1160,23 @@ let mapFilters = {
   logs: null
 };
 
+// Modal Elements
+let modalCampCreator = null;
+let campCreatorForm = null;
+let campCoordsInput = null;
+let btnCloseCampModal = null;
+let btnCancelCampModal = null;
+let starButtons = [];
+let campRatingInput = null;
+let amenityPills = [];
+let selectedAmenities = new Set();
+let currentModalCoords = null; // Store temp coords clicked
+
+// Scouting Banner Elements
+let scoutingStatusBar = null;
+let scoutingStatusText = null;
+let btnClaimCampWizard = null;
+
 // Initialize Map Tab functionality
 function initMapTab() {
   googleApiKeyInput = document.getElementById("google-api-key");
@@ -1165,11 +1186,33 @@ function initMapTab() {
   mapFilters.dumps = document.getElementById("map-filter-dumps");
   mapFilters.logs = document.getElementById("map-filter-logs");
 
+  // Modal DOM
+  modalCampCreator = document.getElementById("modal-camp-creator");
+  campCreatorForm = document.getElementById("camp-creator-form");
+  campCoordsInput = document.getElementById("camp-coords");
+  btnCloseCampModal = document.getElementById("btn-close-camp-modal");
+  btnCancelCampModal = document.getElementById("btn-cancel-camp-modal");
+  campRatingInput = document.getElementById("camp-rating");
+  starButtons = document.querySelectorAll("#camp-star-selector .star-btn");
+  amenityPills = document.querySelectorAll("#camp-amenities-tags .amenity-tag-pill");
+
+  // Banner DOM
+  scoutingStatusBar = document.getElementById("scouting-status-bar");
+  scoutingStatusText = document.getElementById("scouting-status-text");
+  btnClaimCampWizard = document.getElementById("btn-claim-camp-wizard");
+
   // Load saved Google API Key if exists
   const savedKey = localStorage.getItem("rv_boondock_google_key");
   if (savedKey && googleApiKeyInput) {
     googleApiKeyInput.value = savedKey;
   }
+
+  // Load local staged campsites
+  const savedStaged = localStorage.getItem("rv_boondock_staged_camps");
+  if (savedStaged) {
+    stagedCampsites = JSON.parse(savedStaged);
+  }
+  updateScoutingBanner();
 
   // Radio Toggles for map layers
   document.querySelectorAll('input[name="map-layer"]').forEach(radio => {
@@ -1197,7 +1240,6 @@ function initMapTab() {
       }
       localStorage.setItem("rv_boondock_google_key", key);
       alert("Google API Key saved! Reloading map...");
-      // If google map was selected, load Google Maps script dynamically
       const selectedLayerEl = document.querySelector('input[name="map-layer"]:checked');
       if (selectedLayerEl && selectedLayerEl.value === "google-sat") {
         loadGoogleMapsApi(key).then(() => {
@@ -1212,7 +1254,6 @@ function initMapTab() {
       localStorage.removeItem("rv_boondock_google_key");
       if (googleApiKeyInput) googleApiKeyInput.value = "";
       alert("Google API Key removed.");
-      // Force switch back to Leaflet if currently on Google Maps
       const selectedLayerEl = document.querySelector('input[name="map-layer"]:checked');
       if (selectedLayerEl && selectedLayerEl.value === "google-sat") {
         const topoRadio = document.querySelector('input[name="map-layer"][value="topo"]');
@@ -1221,11 +1262,235 @@ function initMapTab() {
       }
     });
   }
+
+  // Star Rating Interaction
+  starButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const rating = parseInt(btn.getAttribute("data-value"));
+      setModalStarRating(rating);
+    });
+  });
+
+  // Amenity Pills Interaction
+  amenityPills.forEach(pill => {
+    pill.addEventListener("click", () => {
+      const val = pill.getAttribute("data-val");
+      if (selectedAmenities.has(val)) {
+        selectedAmenities.delete(val);
+        pill.classList.remove("active");
+      } else {
+        selectedAmenities.add(val);
+        pill.classList.add("active");
+      }
+    });
+  });
+
+  // Modal Close/Cancel
+  if (btnCloseCampModal) btnCloseCampModal.addEventListener("click", hideCampModal);
+  if (btnCancelCampModal) btnCancelCampModal.addEventListener("click", hideCampModal);
+
+  // Form Submit (Save Staged Campsite)
+  if (campCreatorForm) {
+    campCreatorForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      saveStagedCampsite();
+    });
+  }
+
+  // Claim and Set Up Camp Banner Trigger
+  if (btnClaimCampWizard) {
+    btnClaimCampWizard.addEventListener("click", () => {
+      // Prompt user to select which spot they are claiming
+      claimAndPublishStagedCampsites();
+    });
+  }
+}
+
+// Update scouting progress banner
+function updateScoutingBanner() {
+  if (!scoutingStatusBar || !scoutingStatusText) return;
+  
+  if (stagedCampsites.length > 0) {
+    scoutingStatusBar.style.display = "flex";
+    scoutingStatusText.textContent = `📝 You have ${stagedCampsites.length} staged campsite candidate(s). Set up camp at one to publish them!`;
+  } else {
+    scoutingStatusBar.style.display = "none";
+  }
+}
+
+// Show creator modal
+function showCampModal(lat, lng) {
+  if (!modalCampCreator) return;
+  currentModalCoords = { lat, lng };
+  if (campCoordsInput) {
+    campCoordsInput.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  }
+  
+  // Reset fields
+  if (campCreatorForm) campCreatorForm.reset();
+  setModalStarRating(3); // Default rating
+  selectedAmenities.clear();
+  amenityPills.forEach(p => p.classList.remove("active"));
+
+  modalCampCreator.classList.remove("hidden");
+}
+
+function hideCampModal() {
+  if (!modalCampCreator) return;
+  modalCampCreator.classList.add("hidden");
+  currentModalCoords = null;
+}
+
+// Set rating stars UI state
+function setModalStarRating(rating) {
+  if (campRatingInput) campRatingInput.value = rating;
+  starButtons.forEach(btn => {
+    const val = parseInt(btn.getAttribute("data-value"));
+    if (val <= rating) {
+      btn.style.color = "var(--warning)";
+    } else {
+      btn.style.color = "var(--text-muted)";
+    }
+  });
+}
+
+// Save campsite to local queue
+function saveStagedCampsite() {
+  if (!currentModalCoords) return;
+  
+  const statusEl = document.querySelector('input[name="camp-status"]:checked');
+  const status = statusEl ? statusEl.value : "available";
+  const rating = parseInt(campRatingInput.value);
+  const notes = document.getElementById("camp-notes").value;
+  
+  const newCamp = {
+    id: "staged_" + Date.now(),
+    lat: currentModalCoords.lat,
+    lng: currentModalCoords.lng,
+    status: status,
+    rating: rating,
+    amenities: Array.from(selectedAmenities),
+    notes: notes,
+    timestamp: Date.now()
+  };
+
+  // If marked occupied, prompt if they want to claim it immediately
+  if (status === "occupied") {
+    const confirmImmediately = confirm("You marked this campsite as Occupied. Would you like to set up camp here immediately?\n\nThis will publish this spot and all other staged candidates to the community map.");
+    if (confirmImmediately) {
+      // Push to staged list momentarily, then publish everything
+      stagedCampsites.push(newCamp);
+      localStorage.setItem("rv_boondock_staged_camps", JSON.stringify(stagedCampsites));
+      hideCampModal();
+      claimAndPublishStagedCampsites(newCamp.id);
+      return;
+    }
+  }
+
+  // Otherwise, just stage it locally
+  stagedCampsites.push(newCamp);
+  localStorage.setItem("rv_boondock_staged_camps", JSON.stringify(stagedCampsites));
+  
+  hideCampModal();
+  updateScoutingBanner();
+  refreshMapMarkers();
+}
+
+// Check-in and upload staging queue to public database
+function claimAndPublishStagedCampsites(claimedId = null) {
+  if (stagedCampsites.length === 0) {
+    alert("No staged campsites in your scouting queue to claim.");
+    return;
+  }
+
+  let chosenCamp = null;
+
+  if (claimedId) {
+    chosenCamp = stagedCampsites.find(c => c.id === claimedId);
+  } else {
+    // If only one campsite is staged, auto-select it. Otherwise prompt the user.
+    if (stagedCampsites.length === 1) {
+      chosenCamp = stagedCampsites[0];
+    } else {
+      const options = stagedCampsites.map((c, idx) => `${idx + 1}: [Rating: ${c.rating}★] (${c.lat.toFixed(4)}, ${c.lng.toFixed(4)}) - Notes: "${c.notes.slice(0, 20)}..."`).join("\n");
+      const selection = prompt(`Please select which campsite number you are setting up camp at:\n\n${options}\n\nEnter number (1-${stagedCampsites.length}):`);
+      if (!selection) return;
+      const idx = parseInt(selection) - 1;
+      if (isNaN(idx) || idx < 0 || idx >= stagedCampsites.length) {
+        alert("Invalid selection. Check-in canceled.");
+        return;
+      }
+      chosenCamp = stagedCampsites[idx];
+    }
+  }
+
+  if (!chosenCamp) return;
+
+  // Final check-in updates
+  // 1. Chosen spot becomes occupied
+  chosenCamp.status = "occupied";
+  
+  // 2. All other staged spots become available
+  stagedCampsites.forEach(c => {
+    if (c.id !== chosenCamp.id) {
+      c.status = "available";
+    }
+    // Remove temporary client-side prefix
+    if (c.id.startsWith("staged_")) {
+      c.id = c.id.replace("staged_", "camp_");
+    }
+  });
+
+  // 3. Batch commit to Firestore
+  if (db) {
+    const batch = db.batch();
+    stagedCampsites.forEach(c => {
+      const ref = db.collection("shared_campsites").doc(c.id);
+      batch.set(ref, {
+        lat: c.lat,
+        lng: c.lng,
+        status: c.status,
+        rating: c.rating,
+        amenities: c.amenities,
+        notes: c.notes,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    batch.commit().then(() => {
+      alert("🎉 Setup Camp successful! All scouted spots have been published to the community map.");
+      stagedCampsites = [];
+      localStorage.removeItem("rv_boondock_staged_camps");
+      updateScoutingBanner();
+      refreshMapMarkers();
+    }).catch(err => {
+      console.error("Batch write failed, saving locally:", err);
+      alert("Database offline. Campsites saved locally to community spots instead.");
+      fallbackOfflinePublish();
+    });
+  } else {
+    // Offline / Local-only mock database fallback
+    fallbackOfflinePublish();
+  }
+}
+
+// Fallback logic when Firebase connection is unavailable
+function fallbackOfflinePublish() {
+  // Add to local shared arrays
+  stagedCampsites.forEach(c => {
+    sharedCampsites.push(c);
+  });
+  localStorage.setItem("rv_boondock_shared_camps", JSON.stringify(sharedCampsites));
+  
+  alert("🎉 Scouted sites saved to your local offline shared storage.");
+  stagedCampsites = [];
+  localStorage.removeItem("rv_boondock_staged_camps");
+  updateScoutingBanner();
+  refreshMapMarkers();
 }
 
 // Map Tab Active Trigger (from sidebar)
 function onMapTabActive() {
-  // Delay slightly to ensure tab-view has finished displaying and has proper client bounds
   setTimeout(() => {
     const selectedLayerEl = document.querySelector('input[name="map-layer"]:checked');
     const currentLayer = selectedLayerEl ? selectedLayerEl.value : "topo";
@@ -1237,17 +1502,17 @@ function onMapTabActive() {
         switchMapLayer("google-sat");
       }
     } else {
-      // Leaflet Maps
       if (!mapInstance) {
-        // Initialize Leaflet
         const defaultCenter = [35.2536, -111.7942]; // Bellemont
         mapInstance = L.map("interactive-map-canvas").setView(defaultCenter, 12);
-        
-        // Add default tiles
         setLeafletTileLayer("topo");
+        
+        // Leaflet click handler to log campsites
+        mapInstance.on("click", (e) => {
+          showCampModal(e.latlng.lat, e.latlng.lng);
+        });
       }
       
-      // Update sizes & draw markers
       mapInstance.invalidateSize();
       refreshMapMarkers();
     }
@@ -1269,7 +1534,6 @@ function switchMapLayer(layerType) {
       return;
     }
 
-    // Hide Leaflet canvas if showing
     destroyLeafletMap();
     canvas.innerHTML = "";
     
@@ -1284,7 +1548,7 @@ function switchMapLayer(layerType) {
         switchMapLayer("esri-sat");
       });
   } else {
-    // Leaflet Layers (topo or esri-sat)
+    // Leaflet Layers
     if (googleMap) {
       destroyGoogleMap();
       canvas.innerHTML = "";
@@ -1292,6 +1556,9 @@ function switchMapLayer(layerType) {
     
     if (!mapInstance) {
       mapInstance = L.map("interactive-map-canvas").setView([35.2536, -111.7942], 12);
+      mapInstance.on("click", (e) => {
+        showCampModal(e.latlng.lat, e.latlng.lng);
+      });
     }
     
     setLeafletTileLayer(layerType);
@@ -1367,6 +1634,11 @@ function initGoogleMap() {
     tilt: 45
   });
 
+  // Google Maps click listener for campsite creation
+  googleMap.addListener("click", (e) => {
+    showCampModal(e.latLng.lat(), e.latLng.lng());
+  });
+
   refreshMapMarkers();
 }
 
@@ -1398,11 +1670,10 @@ function refreshMapMarkers() {
 
   if (mapInstance) {
     // --- LEAFLET MARKERS ---
-    // Clear old markers
     leafletMarkers.forEach(m => m.remove());
     leafletMarkers = [];
 
-    // User/GPS location marker
+    // User GPS location marker
     if (userLocation) {
       const gpsIcon = L.divIcon({
         className: 'gps-pulse-marker-wrapper',
@@ -1478,7 +1749,7 @@ function refreshMapMarkers() {
       });
     }
 
-    // Logged Spots
+    // Logged Field Spots
     if (showLogs) {
       loggedSpots.forEach(spot => {
         if (!spot.coords) return;
@@ -1501,7 +1772,7 @@ function refreshMapMarkers() {
         const m = L.marker([lat, lng], { icon: svgIcon })
           .addTo(mapInstance)
           .bindPopup(`
-            <h4>Scouted: ${spot.roadNumber}</h4>
+            <h4>Scouted FR: ${spot.roadNumber}</h4>
             <p><strong>Logged:</strong> ${spot.timestamp}</p>
             <p style="margin-top:0.2rem;"><strong>Signal:</strong> ${"★".repeat(spot.signal)}${"☆".repeat(5 - spot.signal)}</p>
             <p style="font-style:italic; margin-top:0.4rem; padding-top:0.4rem; border-top:1px solid rgba(255,255,255,0.05);">"${spot.notes}"</p>
@@ -1509,6 +1780,63 @@ function refreshMapMarkers() {
         leafletMarkers.push(m);
       });
     }
+
+    // --- STAGED/LOCAL PRIVATE SCOUTED CAMPSITES ---
+    stagedCampsites.forEach(c => {
+      const pinColor = "#f59e0b"; // Yellow for staged
+      const svgIcon = L.divIcon({
+        html: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="9" stroke="${pinColor}" stroke-width="2.5" stroke-dasharray="4" fill="rgba(245,158,11,0.15)" />
+                <path d="M12 7V17M7 12H17" stroke="${pinColor}" stroke-width="2" stroke-linecap="round"/>
+               </svg>`,
+        className: "staged-leaflet-marker",
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+        popupAnchor: [0, -10]
+      });
+
+      const m = L.marker([c.lat, c.lng], { icon: svgIcon })
+        .addTo(mapInstance)
+        .bindPopup(`
+          <h4 style="border-left-color: var(--warning);">Candidate (Staged)</h4>
+          <p><strong>Status:</strong> <span style="color:var(--warning); font-weight:700;">Local Draft</span></p>
+          <p><strong>Staged status:</strong> ${c.status.toUpperCase()}</p>
+          <p><strong>Rating:</strong> ${"★".repeat(c.rating)}${"☆".repeat(5 - c.rating)}</p>
+          <p><strong>Amenities:</strong> ${c.amenities.join(", ") || "None"}</p>
+          <p style="font-style:italic; margin-top:0.3rem;">"${c.notes}"</p>
+          <hr style="margin: 0.5rem 0; border:0; border-top: 1px solid var(--border);">
+          <button onclick="claimAndPublishStagedCampsites('${c.id}')" class="btn primary-btn mini-btn" style="width:100%; justify-content:center;">Claim this site & Setup Camp</button>
+        `);
+      leafletMarkers.push(m);
+    });
+
+    // --- SHARED PUBLIC/COMMUNITY CAMPSITES ---
+    sharedCampsites.forEach(c => {
+      const isAvailable = (c.status === "available");
+      const pinColor = isAvailable ? "#10b981" : "#ef4444";
+      const statusText = isAvailable ? "AVAILABLE" : "OCCUPIED";
+
+      const svgIcon = L.divIcon({
+        html: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" fill="${pinColor}" stroke="#fff" stroke-width="1.5"/>
+               </svg>`,
+        className: "shared-camp-leaflet-marker",
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+        popupAnchor: [0, -12]
+      });
+
+      const m = L.marker([c.lat, c.lng], { icon: svgIcon })
+        .addTo(mapInstance)
+        .bindPopup(`
+          <h4 style="border-left-color: ${pinColor};">${isAvailable ? '🏕️ Open Campsite' : '🔒 Occupied Spot'}</h4>
+          <p><strong>Status:</strong> <span class="status-badge" style="background:${pinColor}22; color:${pinColor}; border:1px solid ${pinColor}33; padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight:700; border-radius:4px; display:inline-block;">${statusText}</span></p>
+          <p style="margin-top:0.4rem;"><strong>Rating:</strong> ${"★".repeat(c.rating)}${"☆".repeat(5 - c.rating)}</p>
+          <p><strong>Amenities:</strong> ${c.amenities.join(", ") || "None"}</p>
+          <p style="font-style:italic; margin-top:0.4rem; border-top:1px solid rgba(255,255,255,0.05); padding-top:0.4rem;">"${c.notes}"</p>
+        `);
+      leafletMarkers.push(m);
+    });
 
   } else if (googleMap) {
     // --- GOOGLE MAPS MARKERS ---
@@ -1651,7 +1979,61 @@ function refreshMapMarkers() {
         googleMarkersArray.push(marker);
       });
     }
+
+    // Google Maps Staged/Shared Campsites (Dynamic)
+    stagedCampsites.forEach(c => {
+      const marker = new google.maps.Marker({
+        position: { lat: c.lat, lng: c.lng },
+        map: googleMap,
+        title: "Candidate Site (Staged)",
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 7,
+          fillColor: "#f59e0b",
+          fillOpacity: 0.5,
+          strokeColor: "#f59e0b",
+          strokeWeight: 2
+        }
+      });
+      googleMarkersArray.push(marker);
+    });
+
+    sharedCampsites.forEach(c => {
+      const isAvailable = (c.status === "available");
+      const pinColor = isAvailable ? "#10b981" : "#ef4444";
+      const marker = new google.maps.Marker({
+        position: { lat: c.lat, lng: c.lng },
+        map: googleMap,
+        title: isAvailable ? "Open Campsite" : "Occupied Campsite",
+        icon: {
+          path: "M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z",
+          fillColor: pinColor,
+          fillOpacity: 1.0,
+          strokeColor: "#ffffff",
+          strokeWeight: 1.5,
+          scale: 1.3
+        }
+      });
+      googleMarkersArray.push(marker);
+    });
   }
+}
+
+// Subscribe to Firestore shared campsites database updates
+function startCampsiteSync() {
+  if (!db) return;
+  db.collection("shared_campsites").orderBy("timestamp", "desc").onSnapshot(snapshot => {
+    sharedCampsites = [];
+    snapshot.forEach(doc => {
+      sharedCampsites.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+    refreshMapMarkers();
+  }, err => {
+    console.warn("Firestore campsite sync failed. Running with offline data.");
+  });
 }
 
 // Initializer
@@ -1661,6 +2043,12 @@ function init() {
   
   // Initialize dynamic interactive map controls
   initMapTab();
+
+  // Load offline shared camps
+  const savedShared = localStorage.getItem("rv_boondock_shared_camps");
+  if (savedShared) {
+    sharedCampsites = JSON.parse(savedShared);
+  }
   
   // Fallback to local storage initially/offline
   const savedSpots = localStorage.getItem("rv_boondock_spots");
@@ -1687,10 +2075,14 @@ function init() {
     .then(() => {
       console.log("Firebase SDKs loaded successfully.");
       startFirebaseSync();
+      startCampsiteSync();
     })
     .catch(err => {
       console.warn("Firebase failed to load dynamically (running in offline/local-only mode):", err);
     });
+
+  // Force Leaflet map tab initial setup on load
+  onMapTabActive();
 }
 
 if (document.readyState === "loading") {
