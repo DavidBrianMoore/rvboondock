@@ -1032,3 +1032,117 @@ textarea:focus {
 .flash-success {
   animation: flash-green 1.2s cubic-bezier(0.25, 1, 0.5, 1);
 }
+
+/* ==========================================================================
+   Interactive Map & Leaflet/Google Custom Styling
+   ========================================================================== */
+#interactive-map-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 450px;
+  background: var(--bg-darker);
+}
+
+/* Leaflet Container Overrides */
+.leaflet-container {
+  font-family: var(--font-body) !important;
+  background-color: var(--bg-darker) !important;
+}
+
+/* Dark theme overrides for Leaflet Popups */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: hsl(222, 25%, 10%) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--shadow) !important;
+  border-radius: 12px !important;
+}
+
+.leaflet-popup-content {
+  margin: 1rem !important;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.leaflet-popup-content h4 {
+  font-family: var(--font-heading) !important;
+  color: var(--text-main) !important;
+  font-size: 1.05rem !important;
+  margin-bottom: 0.4rem !important;
+  font-weight: 700 !important;
+  border-left: 3px solid var(--primary);
+  padding-left: 0.5rem;
+}
+
+.leaflet-popup-content p {
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+}
+
+.leaflet-popup-content a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.leaflet-popup-content a:hover {
+  text-decoration: underline;
+}
+
+.leaflet-popup-close-button {
+  color: var(--text-muted) !important;
+  top: 8px !important;
+  right: 8px !important;
+}
+
+/* Dark mode Leaflet zoom controls */
+.leaflet-bar {
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--shadow) !important;
+}
+
+.leaflet-bar a {
+  background-color: hsl(222, 25%, 10%) !important;
+  color: var(--text-main) !important;
+  border-bottom: 1px solid var(--border) !important;
+  transition: var(--transition);
+}
+
+.leaflet-bar a:hover {
+  background-color: var(--card-bg-hover) !important;
+  color: #fff !important;
+}
+
+.leaflet-bar a.leaflet-disabled {
+  background-color: var(--bg-darker) !important;
+  color: var(--text-muted) !important;
+  opacity: 0.5;
+}
+
+/* Pulsing current location dot */
+.gps-pulse-marker {
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7);
+  animation: pulse-gps 1.8s infinite;
+}
+
+@keyframes pulse-gps {
+  0% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7);
+  }
+  70% {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 10px rgba(56, 189, 248, 0);
+  }
+  100% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0);
+  }
+}
+

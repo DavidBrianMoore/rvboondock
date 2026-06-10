@@ -161,6 +161,16 @@ const visualLengthText = document.getElementById("visual-length-text");
 const threatLevelText = document.getElementById("threat-level");
 const clearanceLevelText = document.getElementById("clearance-level");
 
+// Route & Transit Selectors
+const transitStartInput = document.getElementById("transit-start");
+const transitDestSelect = document.getElementById("transit-dest");
+const btnTransitRefresh = document.getElementById("btn-transit-refresh");
+const btnNavGoogle = document.getElementById("btn-nav-google");
+const btnNavGaia = document.getElementById("btn-nav-gaia");
+const btnNavApple = document.getElementById("btn-nav-apple");
+const transitSafetyContent = document.getElementById("transit-safety-content");
+const transitServicesList = document.getElementById("transit-services-list");
+
 // Haversine distance calculator
 function getDistance(lat1, lon1, lat2, lon2) {
   const R = 3958.8; // Earth radius in miles
@@ -270,6 +280,12 @@ navItems.forEach(item => {
     document.getElementById(`tab-${targetTab}`).classList.add("active");
     
     updateHeaderMetadata(targetTab);
+    
+    if (targetTab === 'map') {
+      if (typeof onMapTabActive === 'function') {
+        onMapTabActive();
+      }
+    }
   });
 });
 
@@ -282,6 +298,14 @@ function updateHeaderMetadata(tab) {
     wizard: {
       title: "Systematic Scouting Wizard",
       subtitle: "Execute the critical 4-step dual-app safety scouting workflow."
+    },
+    map: {
+      title: "Interactive Mapping Center",
+      subtitle: "Toggle terrain and satellite layers to scout roads, dumps, and logged spots."
+    },
+    transit: {
+      title: "Route & Transit Planner",
+      subtitle: "Plan navigation routes using Google Maps or Gaia, and check nearby dump stations."
     },
     roads: {
       title: "Forest Roads Explorer",
@@ -491,8 +515,10 @@ function renderRoadsList() {
           <p class="card-description"><strong>Turnaround:</strong> ${road.turnaround}</p>
         </div>
       </div>
-      <div class="btn-group">
-        <a href="${road.satelliteLink}" target="_blank" class="btn primary-btn mini-btn">Ground Truth Check ↗</a>
+      <div class="btn-group" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+        <a href="${road.satelliteLink}" target="_blank" class="btn primary-btn mini-btn" style="flex: 1; text-align: center;">Ground Truth Check ↗</a>
+        <a href="https://www.gaiagps.com/map/?loc=16.0/${road.lng}/${road.lat}" class="btn secondary-btn mini-btn" style="flex: 1; text-align: center; background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25);" target="_blank">Gaia GPS ↗</a>
+        <button class="btn secondary-btn mini-btn" onclick="exportGPX('road', '${road.id}')" style="flex: 1; text-align: center;">Export GPX</button>
       </div>
     `;
     list.appendChild(card);
@@ -573,9 +599,11 @@ function renderDumpList() {
           <p class="card-description"><strong>Seasonality:</strong> ${dump.status}</p>
         </div>
       </div>
-      <div class="btn-group" style="margin-top: 1rem; width: 100%;">
-        <a href="${appleMapsUrl}" class="btn secondary-btn mini-btn maps-btn" style="flex: 1;" target="_blank">🍎 Apple Maps</a>
-        <a href="${googleMapsUrl}" class="btn secondary-btn mini-btn maps-btn" style="flex: 1;" target="_blank">🗺️ Google Maps</a>
+      <div class="btn-group" style="margin-top: 1rem; width: 100%; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+        <a href="${appleMapsUrl}" class="btn secondary-btn mini-btn maps-btn" style="flex: 1; text-align: center;" target="_blank">🍎 Apple Maps</a>
+        <a href="${googleMapsUrl}" class="btn secondary-btn mini-btn maps-btn" style="flex: 1; text-align: center;" target="_blank">🗺️ Google Maps</a>
+        <a href="https://www.gaiagps.com/map/?loc=16.0/${dump.lng}/${dump.lat}" class="btn secondary-btn mini-btn maps-btn" style="flex: 1; text-align: center; background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25);" target="_blank">Gaia GPS ↗</a>
+        <button class="btn secondary-btn mini-btn maps-btn" onclick="exportGPX('dump', '${dump.name}')" style="flex: 1; text-align: center;">Export GPX</button>
       </div>
     `;
     list.appendChild(card);
@@ -725,9 +753,11 @@ function renderLoggedSpots() {
         <div><strong>Closest Dump Station:</strong> ${spot.dumpStation}</div>
         <p class="logged-notes">"${spot.notes}"</p>
       </div>
-      <div class="logged-item-actions">
+      <div class="logged-item-actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
         <button class="btn primary-btn mini-btn" onclick="exportSpot('${spot.id}')">Export MD</button>
-        <button class="btn secondary-btn mini-btn" onclick="deleteSpot('${spot.id}')" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.2)">Delete</button>
+        <button class="btn secondary-btn mini-btn" onclick="exportGPX('spot', '${spot.id}')">Export GPX</button>
+        ${spot.coords ? `<a href="https://www.gaiagps.com/map/?loc=16.0/${spot.coords.split(',')[1].trim()}/${spot.coords.split(',')[0].trim()}" class="btn secondary-btn mini-btn" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25);" target="_blank">Gaia GPS ↗</a>` : ''}
+        <button class="btn secondary-btn mini-btn" onclick="deleteSpot('${spot.id}')" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.2); margin-left: auto;">Delete</button>
       </div>
     `;
     logList.appendChild(item);
@@ -771,13 +801,84 @@ window.exportSpot = function(id) {
   document.body.removeChild(a);
 };
 
-// Initializer
-function init() {
+window.exportGPX = function(type, identifier) {
+  let lat, lng, name, desc;
+  
+  if (type === 'road') {
+    const road = FOREST_ROADS.find(r => r.id === identifier);
+    if (!road) return;
+    lat = road.lat;
+    lng = road.lng;
+    name = `${road.number} - ${road.name}`;
+    desc = `Max Safe Length: ${road.maxLength} ft\nMin Clearance: ${road.minClearance} in\nDifficulty: ${road.difficulty}\nRoad Grade: ${road.roadGrade}\nTurnaround: ${road.turnaround}`;
+  } else if (type === 'dump') {
+    const dump = DUMP_STATIONS.find(d => d.name === identifier);
+    if (!dump) return;
+    lat = dump.lat;
+    lng = dump.lng;
+    name = dump.name;
+    desc = `Location: ${dump.location}\nAddress: ${dump.address}\nFee: ${dump.fee}\nWater: ${dump.water}\nAccess: ${dump.access}`;
+  } else if (type === 'spot') {
+    const spot = loggedSpots.find(s => s.id === identifier);
+    if (!spot) return;
+    const parts = spot.coords.split(",");
+    if (parts.length === 2) {
+      lat = parseFloat(parts[0].trim());
+      lng = parseFloat(parts[1].trim());
+    } else {
+      return;
+    }
+    name = `Scouted Spot - ${spot.roadNumber}`;
+    desc = `Logged Date: ${spot.timestamp}\nSignal: ${spot.signal}/5 Stars\nClosest Dump: ${spot.dumpStation}\nNotes: ${spot.notes}`;
+  }
+
+  if (typeof lat === 'undefined' || typeof lng === 'undefined') return;
+
+  const gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="RVBoondock" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <wpt lat="${lat}" lon="${lng}">
+    <name>${escapeXml(name)}</name>
+    <desc>${escapeXml(desc)}</desc>
+    <sym>Campground</sym>
+  </wpt>
+</gpx>`;
+
+  const blob = new Blob([gpx], { type: "application/gpx+xml;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.gpx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+};
+
+function escapeXml(unsafe) {
+  return unsafe.replace(/[<>&'"]/g, function (c) {
+    switch (c) {
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '&': return '&amp;';
+      case '\'': return '&apos;';
+      case '"': return '&quot;';
+    }
+  });
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = resolve;
+    script.onerror = (err) => reject(new Error(`Failed to load script: ${src}`));
+    document.head.appendChild(script);
+  });
+}
+
+function startFirebaseSync() {
   if (typeof firebase !== 'undefined' && typeof firebase.firestore === 'function') {
     db = firebase.firestore();
   }
-  loadRigProfile();
-  initLoggerSelects();
   
   if (db) {
     // 1. Subscribe to shared real-time location sync
@@ -794,6 +895,9 @@ function init() {
           updateLocationPill();
           renderRoadsList();
           renderDumpList();
+          if (typeof updateTransitRoute === 'function') {
+            updateTransitRoute();
+          }
         }
       }
     });
@@ -808,24 +912,792 @@ function init() {
         });
       });
       renderLoggedSpots();
+      if (typeof populateTransitDestinations === 'function') {
+        populateTransitDestinations();
+      }
     }, err => {
       console.error("Firestore snapshot error (check if Firestore is provisioned in the console):", err);
     });
-  } else {
-    // Fallback to local storage if running without Firebase backend
-    const savedSpots = localStorage.getItem("rv_boondock_spots");
-    if (savedSpots) {
-      loggedSpots = JSON.parse(savedSpots);
-    }
-    renderLoggedSpots();
   }
+}
+
+function populateTransitDestinations() {
+  const selectedVal = transitDestSelect.value;
+  transitDestSelect.innerHTML = "";
+  
+  // Forest Roads Group
+  const roadGroup = document.createElement("optgroup");
+  roadGroup.label = "Forest Roads";
+  FOREST_ROADS.forEach(road => {
+    const opt = document.createElement("option");
+    opt.value = `road_${road.id}`;
+    opt.textContent = `${road.number} - ${road.name}`;
+    roadGroup.appendChild(opt);
+  });
+  transitDestSelect.appendChild(roadGroup);
+  
+  // Dump Stations Group
+  const dumpGroup = document.createElement("optgroup");
+  dumpGroup.label = "Dump Stations";
+  DUMP_STATIONS.forEach(dump => {
+    const opt = document.createElement("option");
+    opt.value = `dump_${dump.name}`;
+    opt.textContent = dump.name;
+    dumpGroup.appendChild(opt);
+  });
+  transitDestSelect.appendChild(dumpGroup);
+  
+  // Scouted Spots Group
+  if (loggedSpots.length > 0) {
+    const spotGroup = document.createElement("optgroup");
+    spotGroup.label = "Scouted Spots";
+    loggedSpots.forEach(spot => {
+      const opt = document.createElement("option");
+      opt.value = `spot_${spot.id}`;
+      opt.textContent = `${spot.roadNumber} - Scouted Spot`;
+      spotGroup.appendChild(opt);
+    });
+    transitDestSelect.appendChild(spotGroup);
+  }
+  
+  // Restore selection if valid
+  if (selectedVal) {
+    transitDestSelect.value = selectedVal;
+  }
+  
+  // If nothing is selected, select the first option
+  if (!transitDestSelect.value && transitDestSelect.options.length > 0) {
+    transitDestSelect.selectedIndex = 0;
+  }
+  
+  updateTransitRoute();
+}
+
+function updateTransitRoute() {
+  // 1. Get Start Coordinates
+  let startLat = 35.2536; // Default to Bellemont coordinates
+  let startLng = -111.7942;
+  
+  if (userLocation) {
+    startLat = userLocation.lat;
+    startLng = userLocation.lng;
+    const timeStr = userLocation.timestamp ? new Date(userLocation.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Just now';
+    transitStartInput.value = `${startLat.toFixed(5)}, ${startLng.toFixed(5)} (${timeStr})`;
+  } else {
+    transitStartInput.value = "Offline / No GPS (Using Bellemont Default)";
+  }
+  
+  // 2. Resolve Selected Destination
+  const destVal = transitDestSelect.value;
+  if (!destVal) return;
+  
+  let destLat, destLng, destName, destType, destObj;
+  
+  if (destVal.startsWith("road_")) {
+    const id = destVal.replace("road_", "");
+    destObj = FOREST_ROADS.find(r => r.id === id);
+    if (destObj) {
+      destLat = destObj.lat;
+      destLng = destObj.lng;
+      destName = destObj.name;
+      destType = "road";
+    }
+  } else if (destVal.startsWith("dump_")) {
+    const name = destVal.replace("dump_", "");
+    destObj = DUMP_STATIONS.find(d => d.name === name);
+    if (destObj) {
+      destLat = destObj.lat;
+      destLng = destObj.lng;
+      destName = destObj.name;
+      destType = "dump";
+    }
+  } else if (destVal.startsWith("spot_")) {
+    const id = destVal.replace("spot_", "");
+    destObj = loggedSpots.find(s => s.id === id);
+    if (destObj && destObj.coords) {
+      const parts = destObj.coords.split(",");
+      if (parts.length === 2) {
+        destLat = parseFloat(parts[0].trim());
+        destLng = parseFloat(parts[1].trim());
+        destName = `Scouted Spot (${destObj.roadNumber})`;
+        destType = "spot";
+      }
+    }
+  }
+  
+  if (typeof destLat === 'undefined' || typeof destLng === 'undefined') {
+    return;
+  }
+  
+  // 3. Update Nav Links
+  btnNavGoogle.href = `https://www.google.com/maps/dir/?api=1&origin=${startLat},${startLng}&destination=${destLat},${destLng}&travelmode=driving`;
+  btnNavGaia.href = `https://www.gaiagps.com/map/?loc=14.0/${destLng}/${destLat}`;
+  btnNavApple.href = `https://maps.apple.com/?saddr=${startLat},${startLng}&daddr=${destLat},${destLng}&dirflg=d`;
+  
+  // 4. Update Rig Safety Verification Panel
+  if (destType === "road") {
+    let statusClass = "status-safe";
+    let statusText = "COMPATIBLE";
+    let message = "";
+    
+    if (rigProfile.length > destObj.maxLength || rigProfile.clearance < destObj.minClearance) {
+      statusClass = "status-danger";
+      statusText = "DANGEROUS";
+      message = `<p style="color: var(--danger); font-weight: 700; margin-top: 0.5rem;">⚠️ WARNING: This road is NOT safe for your rig!</p>
+                 <ul style="margin-left: 1.25rem; margin-top: 0.25rem; font-size: 0.85rem; color: var(--text-main); text-align: left;">
+                   ${rigProfile.length > destObj.maxLength ? `<li>Your rig length (${rigProfile.length}ft) exceeds the road limit (${destObj.maxLength}ft).</li>` : ''}
+                   ${rigProfile.clearance < destObj.minClearance ? `<li>Your ground clearance (${rigProfile.clearance}in) is less than the road requirement (${destObj.minClearance}in).</li>` : ''}
+                 </ul>`;
+    } else if (rigProfile.length > destObj.maxLength - 10) {
+      statusClass = "status-warning";
+      statusText = "CAUTION";
+      message = `<p style="color: var(--warning); font-weight: 700; margin-top: 0.5rem;">⚠️ CAUTION: Tight fit!</p>
+                 <p style="font-size: 0.85rem; margin-top: 0.25rem;">Your rig length (${rigProfile.length}ft) is very close to the safe limit (${destObj.maxLength}ft). Scout the turnaround loops before entering.</p>`;
+    } else {
+      message = `<p style="color: var(--primary); font-weight: 700; margin-top: 0.5rem;">✅ Safe & Vetted!</p>
+                 <p style="font-size: 0.85rem; margin-top: 0.25rem;">Your rig dimensions are within safe parameters for this forest road corridor.</p>`;
+    }
+    
+    const carrierVal = destObj.cellSignal[rigProfile.carrier];
+    const carrierLabel = rigProfile.carrier.toUpperCase();
+    
+    transitSafetyContent.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">
+        <span style="font-family: var(--font-heading); font-weight: 600; font-size: 1.1rem;">${destObj.number} - ${destObj.name}</span>
+        <span class="status-badge ${statusClass}">${statusText}</span>
+      </div>
+      <div style="margin-top: 0.75rem; font-size: 0.9rem; text-align: left;">
+        <div><strong>Road Grade:</strong> ${destObj.roadGrade}</div>
+        <div style="margin-top: 0.25rem;"><strong>Turnaround:</strong> ${destObj.turnaround}</div>
+        <div style="margin-top: 0.25rem;"><strong>Cell Signal (${carrierLabel}):</strong> ${"★".repeat(carrierVal)}${"☆".repeat(5 - carrierVal)}</div>
+      </div>
+      ${message}
+    `;
+  } else if (destType === "dump") {
+    transitSafetyContent.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">
+        <span style="font-family: var(--font-heading); font-weight: 600; font-size: 1.1rem;">${destObj.name}</span>
+        <span class="status-badge ${destObj.public ? 'status-safe' : 'status-danger'}">${destObj.public ? 'PUBLIC' : 'MILITARY ONLY'}</span>
+      </div>
+      <div style="margin-top: 0.75rem; font-size: 0.9rem; text-align: left;">
+        <div><strong>Access Quality:</strong> ${destObj.access}</div>
+        <div style="margin-top: 0.25rem;"><strong>Potable Water:</strong> ${destObj.water}</div>
+        <div style="margin-top: 0.25rem;"><strong>Fee:</strong> ${destObj.fee}</div>
+        <div style="margin-top: 0.25rem;"><strong>Phone:</strong> <a href="tel:${destObj.phone.replace(/\D/g, "")}" class="phone-link">${destObj.phone}</a></div>
+      </div>
+    `;
+  } else if (destType === "spot") {
+    transitSafetyContent.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">
+        <span style="font-family: var(--font-heading); font-weight: 600; font-size: 1.1rem;">Scouted Spot (${destObj.roadNumber})</span>
+        <span class="status-badge status-safe">SCOUTED SPOT</span>
+      </div>
+      <div style="margin-top: 0.75rem; font-size: 0.9rem; text-align: left;">
+        <div><strong>Logged Signal:</strong> ${"★".repeat(destObj.signal)}${"☆".repeat(5 - destObj.signal)}</div>
+        <div style="margin-top: 0.25rem;"><strong>Notes:</strong> "${destObj.notes}"</div>
+        <div style="margin-top: 0.25rem;"><strong>Closest Checked Dump:</strong> ${destObj.dumpStation}</div>
+      </div>
+    `;
+  }
+  
+  // 5. Update Services List Sorted by Distance from Destination
+  const sortedDumps = DUMP_STATIONS.map(dump => {
+    const dist = getDistance(destLat, destLng, dump.lat, dump.lng);
+    return { ...dump, transitDist: dist };
+  }).sort((a, b) => a.transitDist - b.transitDist);
+  
+  transitServicesList.innerHTML = "";
+  
+  // Display top 3 closest dump stations
+  sortedDumps.slice(0, 3).forEach(dump => {
+    const div = document.createElement("div");
+    div.style.background = "rgba(255,255,255,0.02)";
+    div.style.border = "1px solid var(--border)";
+    div.style.padding = "0.75rem";
+    div.style.borderRadius = "8px";
+    div.style.display = "flex";
+    div.style.justifyContent = "space-between";
+    div.style.alignItems = "center";
+    
+    div.innerHTML = `
+      <div style="text-align: left;">
+        <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-main);">${dump.name}</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">
+          ${dump.water} | Fee: ${dump.fee}
+        </div>
+      </div>
+      <div style="text-align: right;">
+        <div style="color: var(--accent); font-weight: 700; font-size: 0.95rem;">${dump.transitDist.toFixed(1)} mi</div>
+        <a href="https://www.google.com/maps/dir/?api=1&origin=${startLat},${startLng}&destination=${dump.lat},${dump.lng}&travelmode=driving" target="_blank" style="font-size: 0.75rem; color: var(--primary); text-decoration: none; margin-top: 0.2rem; display: block;">Route ↗</a>
+      </div>
+    `;
+    transitServicesList.appendChild(div);
+  });
+}
+
+// ==========================================================================
+// Interactive Map Controller (Leaflet.js + Google Maps)
+// ==========================================================================
+
+let mapInstance = null; // Leaflet map object
+let googleMap = null; // Google Maps object
+let isGoogleMapsApiLoaded = false;
+let leafletMarkers = [];
+let googleMarkersArray = [];
+let currentTileLayer = null;
+
+// DOM Elements for Map Tab
+let googleApiKeyInput = null;
+let btnSaveApiKey = null;
+let btnClearApiKey = null;
+let mapFilters = {
+  roads: null,
+  dumps: null,
+  logs: null
+};
+
+// Initialize Map Tab functionality
+function initMapTab() {
+  googleApiKeyInput = document.getElementById("google-api-key");
+  btnSaveApiKey = document.getElementById("btn-save-api-key");
+  btnClearApiKey = document.getElementById("btn-clear-api-key");
+  mapFilters.roads = document.getElementById("map-filter-roads");
+  mapFilters.dumps = document.getElementById("map-filter-dumps");
+  mapFilters.logs = document.getElementById("map-filter-logs");
+
+  // Load saved Google API Key if exists
+  const savedKey = localStorage.getItem("rv_boondock_google_key");
+  if (savedKey && googleApiKeyInput) {
+    googleApiKeyInput.value = savedKey;
+  }
+
+  // Radio Toggles for map layers
+  document.querySelectorAll('input[name="map-layer"]').forEach(radio => {
+    radio.addEventListener("change", (e) => {
+      switchMapLayer(e.target.value);
+    });
+  });
+
+  // Checkbox filters
+  Object.keys(mapFilters).forEach(key => {
+    if (mapFilters[key]) {
+      mapFilters[key].addEventListener("change", () => {
+        refreshMapMarkers();
+      });
+    }
+  });
+
+  // Save/Clear Google API Key
+  if (btnSaveApiKey) {
+    btnSaveApiKey.addEventListener("click", () => {
+      const key = googleApiKeyInput ? googleApiKeyInput.value.trim() : "";
+      if (!key) {
+        alert("Please enter a valid Google Maps API Key.");
+        return;
+      }
+      localStorage.setItem("rv_boondock_google_key", key);
+      alert("Google API Key saved! Reloading map...");
+      // If google map was selected, load Google Maps script dynamically
+      const selectedLayerEl = document.querySelector('input[name="map-layer"]:checked');
+      if (selectedLayerEl && selectedLayerEl.value === "google-sat") {
+        loadGoogleMapsApi(key).then(() => {
+          switchMapLayer("google-sat");
+        });
+      }
+    });
+  }
+
+  if (btnClearApiKey) {
+    btnClearApiKey.addEventListener("click", () => {
+      localStorage.removeItem("rv_boondock_google_key");
+      if (googleApiKeyInput) googleApiKeyInput.value = "";
+      alert("Google API Key removed.");
+      // Force switch back to Leaflet if currently on Google Maps
+      const selectedLayerEl = document.querySelector('input[name="map-layer"]:checked');
+      if (selectedLayerEl && selectedLayerEl.value === "google-sat") {
+        const topoRadio = document.querySelector('input[name="map-layer"][value="topo"]');
+        if (topoRadio) topoRadio.checked = true;
+        switchMapLayer("topo");
+      }
+    });
+  }
+}
+
+// Map Tab Active Trigger (from sidebar)
+function onMapTabActive() {
+  // Delay slightly to ensure tab-view has finished displaying and has proper client bounds
+  setTimeout(() => {
+    const selectedLayerEl = document.querySelector('input[name="map-layer"]:checked');
+    const currentLayer = selectedLayerEl ? selectedLayerEl.value : "topo";
+    
+    if (currentLayer === "google-sat" && isGoogleMapsApiLoaded) {
+      if (googleMap) {
+        google.maps.event.trigger(googleMap, 'resize');
+      } else {
+        switchMapLayer("google-sat");
+      }
+    } else {
+      // Leaflet Maps
+      if (!mapInstance) {
+        // Initialize Leaflet
+        const defaultCenter = [35.2536, -111.7942]; // Bellemont
+        mapInstance = L.map("interactive-map-canvas").setView(defaultCenter, 12);
+        
+        // Add default tiles
+        setLeafletTileLayer("topo");
+      }
+      
+      // Update sizes & draw markers
+      mapInstance.invalidateSize();
+      refreshMapMarkers();
+    }
+  }, 100);
+}
+
+// Switch mapping environment/provider
+function switchMapLayer(layerType) {
+  const canvas = document.getElementById("interactive-map-canvas");
+  if (!canvas) return;
+  
+  if (layerType === "google-sat") {
+    const key = localStorage.getItem("rv_boondock_google_key");
+    if (!key) {
+      alert("No Google Maps API Key found. Please enter a key in the Google API Integration settings first.\n\nFalling back to Leaflet Satellite (Esri Imagery) instead.");
+      const esriRadio = document.querySelector('input[name="map-layer"][value="esri-sat"]');
+      if (esriRadio) esriRadio.checked = true;
+      switchMapLayer("esri-sat");
+      return;
+    }
+
+    // Hide Leaflet canvas if showing
+    destroyLeafletMap();
+    canvas.innerHTML = "";
+    
+    loadGoogleMapsApi(key)
+      .then(() => {
+        initGoogleMap();
+      })
+      .catch(err => {
+        alert(err.message + "\nFalling back to Leaflet Satellite.");
+        const esriRadio = document.querySelector('input[name="map-layer"][value="esri-sat"]');
+        if (esriRadio) esriRadio.checked = true;
+        switchMapLayer("esri-sat");
+      });
+  } else {
+    // Leaflet Layers (topo or esri-sat)
+    if (googleMap) {
+      destroyGoogleMap();
+      canvas.innerHTML = "";
+    }
+    
+    if (!mapInstance) {
+      mapInstance = L.map("interactive-map-canvas").setView([35.2536, -111.7942], 12);
+    }
+    
+    setLeafletTileLayer(layerType);
+    refreshMapMarkers();
+    mapInstance.invalidateSize();
+  }
+}
+
+// Set or replace Leaflet Tile Layers
+function setLeafletTileLayer(type) {
+  if (!mapInstance) return;
+  
+  if (currentTileLayer) {
+    mapInstance.removeLayer(currentTileLayer);
+  }
+  
+  if (type === "topo") {
+    currentTileLayer = L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+      maxZoom: 17,
+      attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+    });
+  } else if (type === "esri-sat") {
+    currentTileLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+      attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    });
+  }
+  
+  if (currentTileLayer) {
+    currentTileLayer.addTo(mapInstance);
+  }
+}
+
+// Load Google Maps Script Asynchronously
+function loadGoogleMapsApi(apiKey) {
+  if (isGoogleMapsApiLoaded) {
+    return Promise.resolve();
+  }
+  
+  return new Promise((resolve, reject) => {
+    if (window.google && window.google.maps) {
+      isGoogleMapsApiLoaded = true;
+      resolve();
+      return;
+    }
+    
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=onGoogleMapsApiCallback`;
+    script.async = true;
+    script.defer = true;
+    
+    window.onGoogleMapsApiCallback = () => {
+      isGoogleMapsApiLoaded = true;
+      resolve();
+    };
+    
+    script.onerror = () => {
+      reject(new Error("Failed to load Google Maps SDK. Please check your network connection or API Key."));
+    };
+    
+    document.head.appendChild(script);
+  });
+}
+
+// Initialize Google Maps instance
+function initGoogleMap() {
+  const canvas = document.getElementById("interactive-map-canvas");
+  if (!canvas) return;
+  
+  googleMap = new google.maps.Map(canvas, {
+    center: { lat: 35.2536, lng: -111.7942 },
+    zoom: 12,
+    mapTypeId: 'satellite',
+    tilt: 45
+  });
+
+  refreshMapMarkers();
+}
+
+// Destroy Leaflet map completely to release DOM
+function destroyLeafletMap() {
+  if (mapInstance) {
+    leafletMarkers.forEach(m => m.remove());
+    leafletMarkers = [];
+    mapInstance.remove();
+    mapInstance = null;
+    currentTileLayer = null;
+  }
+}
+
+// Destroy Google map components
+function destroyGoogleMap() {
+  if (googleMap) {
+    googleMarkersArray.forEach(m => m.setMap(null));
+    googleMarkersArray = [];
+    googleMap = null;
+  }
+}
+
+// Re-render markers depending on mapping engine (Leaflet vs Google)
+function refreshMapMarkers() {
+  const showRoads = mapFilters.roads ? mapFilters.roads.checked : true;
+  const showDumps = mapFilters.dumps ? mapFilters.dumps.checked : true;
+  const showLogs = mapFilters.logs ? mapFilters.logs.checked : true;
+
+  if (mapInstance) {
+    // --- LEAFLET MARKERS ---
+    // Clear old markers
+    leafletMarkers.forEach(m => m.remove());
+    leafletMarkers = [];
+
+    // User/GPS location marker
+    if (userLocation) {
+      const gpsIcon = L.divIcon({
+        className: 'gps-pulse-marker-wrapper',
+        html: '<div class="gps-pulse-marker"></div>',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      });
+      const userMarker = L.marker([userLocation.lat, userLocation.lng], { icon: gpsIcon })
+        .addTo(mapInstance)
+        .bindPopup("<b>My GPS Location</b><br>Currently synced.");
+      leafletMarkers.push(userMarker);
+    }
+
+    // Forest Roads
+    if (showRoads) {
+      FOREST_ROADS.forEach(road => {
+        let pinColor = "#10b981"; // Safe Green
+        let status = "COMPATIBLE";
+        if (rigProfile.length > road.maxLength || rigProfile.clearance < road.minClearance) {
+          pinColor = "#ef4444"; // Dangerous Red
+          status = "DANGEROUS";
+        } else if (rigProfile.length > road.maxLength - 10) {
+          pinColor = "#f59e0b"; // Caution Orange
+          status = "CAUTION";
+        }
+
+        const svgIcon = L.divIcon({
+          html: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2C8.13 2 5 5.13 5 9C5 14.25 12 22 12 22C12 22 19 14.25 19 9C19 5.13 15.87 2 12 2ZM12 11.5C10.62 11.5 9.5 10.38 9.5 9C9.5 7.62 10.62 6.5 12 6.5C13.38 6.5 14.5 7.62 14.5 9C14.5 10.38 13.38 11.5 12 11.5Z" fill="${pinColor}"/>
+                 </svg>`,
+          className: "custom-leaflet-marker",
+          iconSize: [24, 24],
+          iconAnchor: [12, 24],
+          popupAnchor: [0, -20]
+        });
+
+        const m = L.marker([road.lat, road.lng], { icon: svgIcon })
+          .addTo(mapInstance)
+          .bindPopup(`
+            <h4>${road.number} - ${road.name}</h4>
+            <p><strong>Status:</strong> <span class="status-badge" style="background:${pinColor}22; color:${pinColor}; border:1px solid ${pinColor}33; padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight:700; border-radius:4px; display:inline-block; margin-top:0.2rem;">${status}</span></p>
+            <p style="margin-top:0.4rem;"><strong>Max Length:</strong> ${road.maxLength} ft | <strong>Clearance:</strong> ${road.minClearance} in</p>
+            <p style="margin-top:0.2rem;">${road.difficulty} grade complexity</p>
+            <p style="margin-top:0.4rem;"><a href="${road.satelliteLink}" target="_blank">Google Maps Satellite ↗</a></p>
+          `);
+        leafletMarkers.push(m);
+      });
+    }
+
+    // Dump Stations
+    if (showDumps) {
+      DUMP_STATIONS.forEach(dump => {
+        const svgIcon = L.divIcon({
+          html: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2C8.13 2 5 5.13 5 9C5 14.25 12 22 12 22C12 22 19 14.25 19 9C19 5.13 15.87 2 12 2ZM12 11.5C10.62 11.5 9.5 10.38 9.5 9C9.5 7.62 10.62 6.5 12 6.5C13.38 6.5 14.5 7.62 14.5 9C14.5 10.38 13.38 11.5 12 11.5Z" fill="#38bdf8"/>
+                 </svg>`,
+          className: "custom-leaflet-marker",
+          iconSize: [24, 24],
+          iconAnchor: [12, 24],
+          popupAnchor: [0, -20]
+        });
+
+        const m = L.marker([dump.lat, dump.lng], { icon: svgIcon })
+          .addTo(mapInstance)
+          .bindPopup(`
+            <h4>${dump.name}</h4>
+            <p><strong>Location:</strong> ${dump.location}</p>
+            <p style="margin-top:0.2rem;"><strong>Fee:</strong> ${dump.fee} | <strong>Water:</strong> ${dump.water}</p>
+            <p style="margin-top:0.2rem;">${dump.access}</p>
+            <p style="margin-top:0.4rem;"><a href="tel:${dump.phone.replace(/\D/g, "")}">📞 Call Station</a></p>
+          `);
+        leafletMarkers.push(m);
+      });
+    }
+
+    // Logged Spots
+    if (showLogs) {
+      loggedSpots.forEach(spot => {
+        if (!spot.coords) return;
+        const parts = spot.coords.split(",");
+        if (parts.length !== 2) return;
+        const lat = parseFloat(parts[0].trim());
+        const lng = parseFloat(parts[1].trim());
+        if (isNaN(lat) || isNaN(lng)) return;
+
+        const svgIcon = L.divIcon({
+          html: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2C8.13 2 5 5.13 5 9C5 14.25 12 22 12 22C12 22 19 14.25 19 9C19 5.13 15.87 2 12 2ZM12 11.5C10.62 11.5 9.5 10.38 9.5 9C9.5 7.62 10.62 6.5 12 6.5C13.38 6.5 14.5 7.62 14.5 9C14.5 10.38 13.38 11.5 12 11.5Z" fill="#a855f7"/>
+                 </svg>`,
+          className: "custom-leaflet-marker",
+          iconSize: [24, 24],
+          iconAnchor: [12, 24],
+          popupAnchor: [0, -20]
+        });
+
+        const m = L.marker([lat, lng], { icon: svgIcon })
+          .addTo(mapInstance)
+          .bindPopup(`
+            <h4>Scouted: ${spot.roadNumber}</h4>
+            <p><strong>Logged:</strong> ${spot.timestamp}</p>
+            <p style="margin-top:0.2rem;"><strong>Signal:</strong> ${"★".repeat(spot.signal)}${"☆".repeat(5 - spot.signal)}</p>
+            <p style="font-style:italic; margin-top:0.4rem; padding-top:0.4rem; border-top:1px solid rgba(255,255,255,0.05);">"${spot.notes}"</p>
+          `);
+        leafletMarkers.push(m);
+      });
+    }
+
+  } else if (googleMap) {
+    // --- GOOGLE MAPS MARKERS ---
+    googleMarkersArray.forEach(m => m.setMap(null));
+    googleMarkersArray = [];
+
+    // GPS location
+    if (userLocation) {
+      const marker = new google.maps.Marker({
+        position: { lat: userLocation.lat, lng: userLocation.lng },
+        map: googleMap,
+        title: "My GPS Location",
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: "#0ea5e9",
+          fillOpacity: 1.0,
+          strokeColor: "#ffffff",
+          strokeWeight: 2
+        }
+      });
+      googleMarkersArray.push(marker);
+    }
+
+    // Forest Roads
+    if (showRoads) {
+      FOREST_ROADS.forEach(road => {
+        let pinColor = "#10b981"; // Safe Green
+        if (rigProfile.length > road.maxLength || rigProfile.clearance < road.minClearance) {
+          pinColor = "#ef4444"; // Dangerous Red
+        } else if (rigProfile.length > road.maxLength - 10) {
+          pinColor = "#f59e0b"; // Caution Orange
+        }
+
+        const marker = new google.maps.Marker({
+          position: { lat: road.lat, lng: road.lng },
+          map: googleMap,
+          title: `${road.number} - ${road.name}`,
+          icon: {
+            path: "M12 2C8.13 2 5 5.13 5 9C5 14.25 12 22 12 22C12 22 19 14.25 19 9C19 5.13 15.87 2 12 2ZM12 11.5C10.62 11.5 9.5 10.38 9.5 9C9.5 7.62 10.62 6.5 12 6.5C13.38 6.5 14.5 7.62 14.5 9C14.5 10.38 13.38 11.5 12 11.5Z",
+            fillColor: pinColor,
+            fillOpacity: 1.0,
+            strokeWeight: 0,
+            scale: 1.5,
+            anchor: new google.maps.Point(12, 22)
+          }
+        });
+
+        const infowindow = new google.maps.InfoWindow({
+          content: `
+            <div style="color:#0f172a; padding: 4px; font-family: var(--font-body);">
+              <h4 style="margin: 0 0 4px 0; color:#0f172a; font-family:var(--font-heading); font-size:1.05rem; font-weight:700; border-left: 3px solid ${pinColor}; padding-left:6px;">${road.number} - ${road.name}</h4>
+              <p style="margin: 4px 0; font-size:0.85rem;"><strong>Max Length:</strong> ${road.maxLength} ft | <strong>Clearance:</strong> ${road.minClearance} in</p>
+              <p style="margin: 4px 0; font-size: 0.8rem; color:#64748b;">Difficulty: ${road.difficulty}</p>
+            </div>
+          `
+        });
+
+        marker.addListener("click", () => {
+          infowindow.open(googleMap, marker);
+        });
+
+        googleMarkersArray.push(marker);
+      });
+    }
+
+    // Dump Stations
+    if (showDumps) {
+      DUMP_STATIONS.forEach(dump => {
+        const marker = new google.maps.Marker({
+          position: { lat: dump.lat, lng: dump.lng },
+          map: googleMap,
+          title: dump.name,
+          icon: {
+            path: "M12 2C8.13 2 5 5.13 5 9C5 14.25 12 22 12 22C12 22 19 14.25 19 9C19 5.13 15.87 2 12 2ZM12 11.5C10.62 11.5 9.5 10.38 9.5 9C9.5 7.62 10.62 6.5 12 6.5C13.38 6.5 14.5 7.62 14.5 9C14.5 10.38 13.38 11.5 12 11.5Z",
+            fillColor: "#38bdf8",
+            fillOpacity: 1.0,
+            strokeWeight: 0,
+            scale: 1.5,
+            anchor: new google.maps.Point(12, 22)
+          }
+        });
+
+        const infowindow = new google.maps.InfoWindow({
+          content: `
+            <div style="color:#0f172a; padding: 4px; font-family: var(--font-body);">
+              <h4 style="margin: 0 0 4px 0; color:#0f172a; font-family:var(--font-heading); font-size:1.05rem; font-weight:700; border-left:3px solid #38bdf8; padding-left:6px;">${dump.name}</h4>
+              <p style="margin: 4px 0; font-size:0.85rem;"><strong>Fee:</strong> ${dump.fee} | <strong>Water:</strong> ${dump.water}</p>
+              <p style="margin: 4px 0; font-size: 0.8rem; color:#64748b;">${dump.access}</p>
+            </div>
+          `
+        });
+
+        marker.addListener("click", () => {
+          infowindow.open(googleMap, marker);
+        });
+
+        googleMarkersArray.push(marker);
+      });
+    }
+
+    // Logged Spots
+    if (showLogs) {
+      loggedSpots.forEach(spot => {
+        if (!spot.coords) return;
+        const parts = spot.coords.split(",");
+        if (parts.length !== 2) return;
+        const lat = parseFloat(parts[0].trim());
+        const lng = parseFloat(parts[1].trim());
+        if (isNaN(lat) || isNaN(lng)) return;
+
+        const marker = new google.maps.Marker({
+          position: { lat: lat, lng: lng },
+          map: googleMap,
+          title: `Scouted Spot - ${spot.roadNumber}`,
+          icon: {
+            path: "M12 2C8.13 2 5 5.13 5 9C5 14.25 12 22 12 22C12 22 19 14.25 19 9C19 5.13 15.87 2 12 2ZM12 11.5C10.62 11.5 9.5 10.38 9.5 9C9.5 7.62 10.62 6.5 12 6.5C13.38 6.5 14.5 7.62 14.5 9C14.5 10.38 13.38 11.5 12 11.5Z",
+            fillColor: "#a855f7",
+            fillOpacity: 1.0,
+            strokeWeight: 0,
+            scale: 1.5,
+            anchor: new google.maps.Point(12, 22)
+          }
+        });
+
+        const infowindow = new google.maps.InfoWindow({
+          content: `
+            <div style="color:#0f172a; padding: 4px; font-family: var(--font-body);">
+              <h4 style="margin: 0 0 4px 0; color:#0f172a; font-family:var(--font-heading); font-size:1.05rem; font-weight:700; border-left:3px solid #a855f7; padding-left:6px;">Scouted Spot (${spot.roadNumber})</h4>
+              <p style="margin: 4px 0; font-size:0.85rem; font-style: italic;">"${spot.notes}"</p>
+              <p style="margin: 4px 0; font-size: 0.8rem; color:#64748b;">Signal Strength: ${spot.signal}/5</p>
+            </div>
+          `
+        });
+
+        marker.addListener("click", () => {
+          infowindow.open(googleMap, marker);
+        });
+
+        googleMarkersArray.push(marker);
+      });
+    }
+  }
+}
+
+// Initializer
+function init() {
+  loadRigProfile();
+  initLoggerSelects();
+  
+  // Initialize dynamic interactive map controls
+  initMapTab();
+  
+  // Fallback to local storage initially/offline
+  const savedSpots = localStorage.getItem("rv_boondock_spots");
+  if (savedSpots) {
+    loggedSpots = JSON.parse(savedSpots);
+  }
+  renderLoggedSpots();
   
   renderRoadsList();
   renderDumpList();
   updateWizardUI();
+  
+  // Initialize Transit tab dropdown & routing setup
+  populateTransitDestinations();
+  transitDestSelect.addEventListener("change", updateTransitRoute);
+  btnTransitRefresh.addEventListener("click", () => {
+    syncCurrentGPS();
+  });
+
+  // Load Firebase dynamically in the background to ensure immediate app responsiveness
+  loadScript("https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js")
+    .then(() => loadScript("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"))
+    .then(() => loadScript("/__/firebase/init.js?useEmulator=false"))
+    .then(() => {
+      console.log("Firebase SDKs loaded successfully.");
+      startFirebaseSync();
+    })
+    .catch(err => {
+      console.warn("Firebase failed to load dynamically (running in offline/local-only mode):", err);
+    });
 }
 
-window.addEventListener("DOMContentLoaded", init);
+if (document.readyState === "loading") {
+  window.addEventListener("DOMContentLoaded", init);
+} else {
+  init();
+}
 } catch (globalInitError) {
   alert("CRITICAL APP INITIALIZATION ERROR:\n" + globalInitError.message + "\n\nStack:\n" + globalInitError.stack);
 }
