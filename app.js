@@ -1182,6 +1182,8 @@ function initMapTab() {
   googleApiKeyInput = document.getElementById("google-api-key");
   btnSaveApiKey = document.getElementById("btn-save-api-key");
   btnClearApiKey = document.getElementById("btn-clear-api-key");
+  importCoordsInput = document.getElementById("import-coords-input");
+  btnImportCoords = document.getElementById("btn-import-coords");
   mapFilters.roads = document.getElementById("map-filter-roads");
   mapFilters.dumps = document.getElementById("map-filter-dumps");
   mapFilters.logs = document.getElementById("map-filter-logs");
@@ -1242,6 +1244,11 @@ function initMapTab() {
       if (sidebarBackdrop) sidebarBackdrop.classList.add("hidden");
     });
   });
+
+  // Clipboard Importer Action
+  if (btnImportCoords) {
+    btnImportCoords.addEventListener("click", handleClipboardImport);
+  }
 
   // Load saved Google API Key if exists
   const savedKey = localStorage.getItem("rv_boondock_google_key");
@@ -2078,6 +2085,111 @@ function startCampsiteSync() {
   });
 }
 
+// ==========================================================================
+// Coordinates Parser & Location Importer Helpers (Google/Apple Maps/Clipboard)
+// ==========================================================================
+
+function extractCoordinates(text) {
+  if (!text) return null;
+  
+  // 1. Try matching simple decimal coordinates like 35.2536, -111.7942
+  const coordRegex = /(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/;
+  const match = text.match(coordRegex);
+  if (match) {
+    const lat = parseFloat(match[1]);
+    const lng = parseFloat(match[2]);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      return { lat, lng };
+    }
+  }
+
+  // 2. Try parsing from Google Maps standard share links or query strings
+  const urlParams = ['q', 'query', 'll', 'daddr', 'saddr'];
+  for (const param of urlParams) {
+    const reg = new RegExp(`[?&]${param}=([^&]+)`);
+    const m = text.match(reg);
+    if (m) {
+      const decoded = decodeURIComponent(m[1]);
+      const parts = decoded.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
+      if (parts) {
+        const lat = parseFloat(parts[1]);
+        const lng = parseFloat(parts[2]);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          return { lat, lng };
+        }
+      }
+    }
+  }
+
+  // 3. Fallback: search for any two float numbers near each other in the string
+  const floats = text.match(/-?\d+\.\d+/g);
+  if (floats && floats.length >= 2) {
+    const lat = parseFloat(floats[0]);
+    const lng = parseFloat(floats[1]);
+    // Safety check coordinates range limits
+    if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      return { lat, lng };
+    }
+  }
+  
+  return null;
+}
+
+function handleClipboardImport() {
+  if (!importCoordsInput) return;
+  const text = importCoordsInput.value.trim();
+  if (!text) {
+    alert("Please paste coordinates or a link first.");
+    return;
+  }
+  
+  const coords = extractCoordinates(text);
+  if (coords) {
+    zoomToCoordinates(coords.lat, coords.lng);
+    showCampModal(coords.lat, coords.lng);
+    importCoordsInput.value = "";
+  } else {
+    alert("Could not extract coordinates from the pasted text. Make sure it contains decimal coordinates like '35.2536, -111.7942'.");
+  }
+}
+
+function zoomToCoordinates(lat, lng) {
+  if (mapInstance) {
+    mapInstance.setView([lat, lng], 15);
+  }
+  if (googleMap) {
+    googleMap.setCenter({ lat, lng });
+    googleMap.setZoom(15);
+  }
+}
+
+function handleIncomingShareTarget() {
+  const params = new URLSearchParams(window.location.search);
+  const title = params.get("title") || "";
+  const text = params.get("text") || "";
+  const url = params.get("url") || "";
+  
+  const payload = `${title} ${text} ${url}`.trim();
+  if (!payload) return;
+  
+  const coords = extractCoordinates(payload);
+  if (coords) {
+    console.log("Successfully extracted PWA Share Target coordinates:", coords);
+    // Delay slightly to ensure map container has loaded
+    setTimeout(() => {
+      onMapTabActive();
+      zoomToCoordinates(coords.lat, coords.lng);
+      showCampModal(coords.lat, coords.lng);
+      
+      // Clean query params so reload doesn't trigger modal again
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }, 1000);
+  } else {
+    console.warn("Share target payload did not contain parseable coordinates.");
+  }
+}
+
 // Initializer
 function init() {
   loadRigProfile();
@@ -2125,6 +2237,9 @@ function init() {
 
   // Force Leaflet map tab initial setup on load
   onMapTabActive();
+
+  // Inspect shared payload if shared via operating system
+  handleIncomingShareTarget();
 }
 
 if (document.readyState === "loading") {
