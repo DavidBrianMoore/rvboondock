@@ -1201,6 +1201,48 @@ function initMapTab() {
   scoutingStatusText = document.getElementById("scouting-status-text");
   btnClaimCampWizard = document.getElementById("btn-claim-camp-wizard");
 
+  // Sandwich Menu Drawer Listeners
+  const btnHamburger = document.getElementById("btn-hamburger");
+  const sidebarBackdrop = document.getElementById("sidebar-backdrop");
+  
+  if (btnHamburger) {
+    btnHamburger.addEventListener("click", () => {
+      const sidebar = document.querySelector(".sidebar");
+      if (sidebar && sidebarBackdrop) {
+        const isOpen = sidebar.classList.contains("open");
+        if (isOpen) {
+          sidebar.classList.remove("open");
+          sidebarBackdrop.classList.add("hidden");
+        } else {
+          sidebar.classList.add("open");
+          sidebarBackdrop.classList.remove("hidden");
+        }
+        // Force mapping canvas redraw to adjust boundaries during drawer animation
+        setTimeout(() => {
+          if (mapInstance) mapInstance.invalidateSize();
+          if (googleMap) google.maps.event.trigger(googleMap, 'resize');
+        }, 360);
+      }
+    });
+  }
+
+  if (sidebarBackdrop) {
+    sidebarBackdrop.addEventListener("click", () => {
+      const sidebar = document.querySelector(".sidebar");
+      if (sidebar) sidebar.classList.remove("open");
+      sidebarBackdrop.classList.add("hidden");
+    });
+  }
+
+  // Auto-close sliding drawer when navigation menu items are selected
+  document.querySelectorAll(".nav-item").forEach(item => {
+    item.addEventListener("click", () => {
+      const sidebar = document.querySelector(".sidebar");
+      if (sidebar) sidebar.classList.remove("open");
+      if (sidebarBackdrop) sidebarBackdrop.classList.add("hidden");
+    });
+  });
+
   // Load saved Google API Key if exists
   const savedKey = localStorage.getItem("rv_boondock_google_key");
   if (savedKey && googleApiKeyInput) {
