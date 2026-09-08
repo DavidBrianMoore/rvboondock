@@ -329,6 +329,14 @@ function updateHeaderMetadata(tab) {
     pageTitle.textContent = metadata[tab].title;
     pageSubtitle.textContent = metadata[tab].subtitle;
   }
+
+  // Toggle display of rig info pills (hidden on landing map page, shown on other tabs)
+  const rigInfoPills = document.querySelectorAll(".rig-info-pill");
+  if (tab === "map") {
+    rigInfoPills.forEach(pill => pill.style.display = "none");
+  } else {
+    rigInfoPills.forEach(pill => pill.style.display = "flex");
+  }
 }
 
 // Rig Profile Functionality
@@ -1242,6 +1250,30 @@ function initMapTab() {
       const sidebar = document.querySelector(".sidebar");
       if (sidebar) sidebar.classList.remove("open");
       if (sidebarBackdrop) sidebarBackdrop.classList.add("hidden");
+    });
+  });
+
+  // Sidebar Sub-menus (Accordion settings) toggling
+  document.querySelectorAll(".submenu-header").forEach(header => {
+    header.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const targetId = header.getAttribute("data-target");
+      const targetContent = document.getElementById(targetId);
+      const arrow = header.querySelector(".submenu-arrow");
+      if (targetContent) {
+        const isCollapsed = targetContent.classList.contains("collapsed");
+        if (isCollapsed) {
+          targetContent.classList.remove("collapsed");
+          if (arrow) {
+            arrow.textContent = "▼";
+          }
+        } else {
+          targetContent.classList.add("collapsed");
+          if (arrow) {
+            arrow.textContent = "▶";
+          }
+        }
+      }
     });
   });
 

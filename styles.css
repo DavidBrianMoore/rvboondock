@@ -62,6 +62,7 @@ body {
   transform: translateX(-100%);
   transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 10px 0 30px rgba(0, 0, 0, 0.45);
+  overflow-y: auto;
 }
 
 .sidebar.open {
@@ -1189,9 +1190,8 @@ textarea:focus {
 
 /* Responsive Grid and Map Styles */
 .map-layout-grid {
-  display: grid;
-  grid-template-columns: 2.5fr 1fr;
-  gap: 1.5rem;
+  display: block;
+  width: 100%;
   height: calc(100vh - 180px);
   min-height: 580px;
 }
@@ -1203,32 +1203,18 @@ textarea:focus {
   flex-direction: column;
   overflow: hidden;
   height: 100%;
-}
-
-.map-controls-card {
-  padding: 1.5rem !important;
-  justify-content: flex-start;
-  gap: 1.25rem;
-  overflow-y: auto;
-  height: 100%;
+  width: 100%;
 }
 
 /* Mobile responsive styles */
 @media (max-width: 768px) {
   .map-layout-grid {
-    grid-template-columns: 1fr;
-    height: auto;
-    min-height: auto;
-    gap: 1rem;
+    height: calc(100vh - 200px);
+    min-height: 450px;
   }
   
   .map-canvas-card {
-    height: 380px !important;
-  }
-  
-  .map-controls-card {
-    height: auto;
-    overflow-y: visible;
+    height: 100% !important;
   }
   
   #scouting-status-bar {
@@ -1324,6 +1310,65 @@ textarea:focus {
 
 .sidebar-backdrop.hidden {
   opacity: 0;
+  pointer-events: none;
+}
+
+/* Sidebar Accordions */
+.submenu-accordion {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.submenu-accordion:hover {
+  border-color: rgba(56, 189, 248, 0.3);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.submenu-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.8rem;
+  background: none;
+  border: none;
+  color: var(--text-main);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s ease;
+}
+
+.submenu-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.submenu-arrow {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  transition: transform 0.3s ease;
+  display: inline-block;
+}
+
+.submenu-content {
+  padding: 0.25rem 0.8rem 0.8rem 0.8rem;
+  border-top: 1px solid var(--border);
+  max-height: 500px;
+  opacity: 1;
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, padding 0.35s ease;
+}
+
+.submenu-content.collapsed {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-top-color: transparent;
   pointer-events: none;
 }
 

@@ -29,8 +29,13 @@ try {
   
   if (versionRegex.test(indexHtml)) {
     indexHtml = indexHtml.replace(versionRegex, `$1${version}$2`);
+    
+    // Cache-bust styles.css and app.js links to force reload on mobile browsers
+    indexHtml = indexHtml.replace(/href="\/styles\.css(?:\?v=[^"]*)?"/, `href="/styles.css?v=${version}"`);
+    indexHtml = indexHtml.replace(/src="\/app\.js(?:\?v=[^"]*)?"/, `src="/app.js?v=${version}"`);
+    
     fs.writeFileSync(indexPath, indexHtml, 'utf8');
-    console.log(`✅ Successfully updated index.html to ${version}`);
+    console.log(`✅ Successfully updated index.html to ${version} and cache-busted asset links`);
   } else {
     console.warn('⚠️ Could not find app-version tag placeholder in index.html.');
   }
